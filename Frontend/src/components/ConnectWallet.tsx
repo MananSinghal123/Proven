@@ -30,7 +30,7 @@ export function ConnectWallet() {
     return (
       <div className="relative" ref={dropdownRef}>
         <button
-          className="px-5 py-2 rounded-lg bg-brand text-void-deep text-sm font-semibold hover:bg-brand-light transition-all duration-200 shadow-neon-green hover:shadow-neon-green-lg"
+          className="px-5 py-2 rounded-lg border border-brand/30 bg-brand/10 text-brand text-sm font-semibold hover:bg-brand/20 hover:border-brand/50 transition-all duration-200"
           onClick={() => setShowConnectors(!showConnectors)}
         >
           {isLoading ? (
