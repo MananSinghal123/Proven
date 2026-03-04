@@ -29,7 +29,7 @@ export function Home() {
             </h1>
 
             <p className="text-white/40 text-lg leading-relaxed max-w-lg mb-10">
-              Lock liquidity until milestones are met. Verified by Reactive Smart Contracts. No trust required — just code.
+              A better place to launch your token. Liquidity secured by milestones, not time — verified autonomously by Reactive Smart Contracts.
             </p>
 
             <div className="flex flex-wrap gap-4">

@@ -1,13 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { useAccount, useConnect, useDisconnect, useNetwork, useSwitchNetwork } from 'wagmi'
-import { unichainSepolia } from '../config/wagmi'
+import { useAccount, useConnect, useDisconnect, useNetwork } from 'wagmi'
 
 export function ConnectWallet() {
   const { address, isConnected } = useAccount()
   const { connect, connectors, isLoading, pendingConnector } = useConnect()
   const { disconnect } = useDisconnect()
   const { chain } = useNetwork()
-  const { switchNetwork } = useSwitchNetwork()
 
   const [showDropdown, setShowDropdown] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
@@ -26,8 +24,6 @@ export function ConnectWallet() {
 
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`
-
-  const isWrongNetwork = chain && chain.id !== unichainSepolia.id
 
   if (!isConnected) {
     return (
@@ -92,15 +88,6 @@ export function ConnectWallet() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {isWrongNetwork && (
-        <button
-          onClick={() => switchNetwork?.(unichainSepolia.id)}
-          className="mr-2 px-2 py-1 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-medium cursor-pointer hover:bg-red-500/20 transition"
-        >
-          ⚠ Wrong Network
-        </button>
-      )}
-
       <button
         onClick={() => setShowDropdown(!showDropdown)}
         className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-brand/20 bg-brand/5 hover:bg-brand/10 transition-all duration-300"
@@ -111,7 +98,7 @@ export function ConnectWallet() {
         </div>
 
         <span className="text-[10px] font-mono font-bold text-brand/60 uppercase">
-          {chain?.name === 'Unichain Sepolia' ? 'UNI' : chain?.name?.slice(0, 3) || '???'}
+          {chain?.name?.slice(0, 5) || 'NET'}
         </span>
 
         <span className="text-xs font-mono text-white/80">
@@ -162,18 +149,6 @@ export function ConnectWallet() {
             >
               <span>🔗</span> View on Explorer ↗
             </a>
-
-            {switchNetwork && (
-              <button
-                onClick={() => {
-                  switchNetwork(unichainSepolia.id)
-                  setShowDropdown(false)
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/5 transition-all"
-              >
-                <span>⛓</span> Switch to Unichain Sepolia
-              </button>
-            )}
 
             <button
               onClick={() => {
