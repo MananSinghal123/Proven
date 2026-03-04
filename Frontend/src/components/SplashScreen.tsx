@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState, useRef } from 'react'
-import { Check } from 'lucide-react'
+import { ProvenLogo } from './ProvenLogo'
 
 interface SplashScreenProps {
   onComplete: () => void
@@ -200,31 +200,21 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
             }}
           />
 
-          {/* Checkmark circle container */}
+          {/* Logo container */}
           <motion.div
-            className="relative rounded-full border-4 border-[#00E676] flex items-center justify-center"
+            className="relative flex items-center justify-center"
             style={{
               width: 'clamp(5rem, 15vw, 10rem)',
               height: 'clamp(5rem, 15vw, 10rem)',
-              background: 'rgba(0, 230, 118, 0.1)',
-              boxShadow:
-                '0 0 40px rgba(0, 230, 118, 0.4), inset 0 0 40px rgba(0, 230, 118, 0.1)',
             }}
             animate={
               phase === 'shine'
-                ? { borderColor: ['#00E676', '#69F0AE', '#00E676'] }
+                ? { filter: ['drop-shadow(0 0 20px rgba(0,230,118,0.4))', 'drop-shadow(0 0 40px rgba(0,230,118,0.7))', 'drop-shadow(0 0 20px rgba(0,230,118,0.4))'] }
                 : {}
             }
             transition={{ duration: 1.2 }}
           >
-            <Check
-              className="text-[#00E676]"
-              style={{
-                width: 'clamp(2.5rem, 8vw, 5rem)',
-                height: 'clamp(2.5rem, 8vw, 5rem)',
-                strokeWidth: 3,
-              }}
-            />
+            <ProvenLogo size={120} className="w-full h-full" />
           </motion.div>
 
           {/* Spinning ring around checkmark */}

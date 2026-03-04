@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Shield, Lock, TrendingUp, CheckCircle, AlertTriangle, Activity, ArrowRight, XCircle, Eye, Zap, BarChart3, Users, DollarSign, ShieldAlert, ArrowUpRight } from 'lucide-react'
+import { Shield, Lock, CheckCircle, Activity, ArrowRight, XCircle, Eye, BarChart3, Users, DollarSign, ShieldAlert, ArrowUpRight } from 'lucide-react'
 import { AnimatedCounter } from '../components/AnimatedCounter'
 import { NetworkSphere } from '../components/NetworkSphere'
+import { ProvenLogo } from '../components/ProvenLogo'
 
 const TICKER_ITEMS = [
   { event: 'MILESTONE_UNLOCKED', project: '$NOVA', detail: 'TVL hit $1M', time: '2m' },
@@ -347,9 +348,7 @@ export function Home() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center">
-                  <CheckCircle className="w-4 h-4 text-void" />
-                </div>
+                <ProvenLogo size={28} />
                 <span className="text-sm font-semibold text-white">Proven Protocol</span>
               </div>
               <p className="text-xs text-white/25 leading-relaxed">

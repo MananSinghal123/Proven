@@ -1,0 +1,15 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer Cube -->
+  <path d="M6 17 L32 32 L32 62 L6 47 Z" fill="#072E18"/>
+  <path d="M58 17 L58 47 L32 62 L32 32 Z" fill="#00A844"/>
+  <path d="M6 17 L32 2 L58 17 L32 32 Z" fill="#69F0AE"/>
+  <!-- Opening -->
+  <path d="M18 19 L32 10 L46 19 L32 27 Z" fill="#030B06"/>
+  <!-- Interior Walls -->
+  <path d="M18 19 L32 27 L32 42 L18 34 Z" fill="#0d3d22"/>
+  <path d="M46 19 L46 34 L32 42 L32 27 Z" fill="#00C853"/>
+  <!-- Inner Cube -->
+  <path d="M24 27 L32 31 L32 39 L24 35 Z" fill="#0A2818"/>
+  <path d="M40 27 L40 35 L32 39 L32 31 Z" fill="#00E676"/>
+  <path d="M24 27 L32 23 L40 27 L32 31 Z" fill="#B9F6CA"/>
+</svg>

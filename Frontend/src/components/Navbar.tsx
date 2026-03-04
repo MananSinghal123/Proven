@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { ConnectWallet } from './ConnectWallet'
+import { ProvenLogo } from './ProvenLogo'
 
 export function Navbar() {
   const location = useLocation()
@@ -16,11 +17,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center shadow-neon-green group-hover:shadow-neon-green-lg transition-shadow duration-500">
-            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
-              <path d="M9 12l2 2 4-4" stroke="#030B06" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
+          <ProvenLogo size={28} className="drop-shadow-[0_0_6px_rgba(0,230,118,0.3)] group-hover:drop-shadow-[0_0_12px_rgba(0,230,118,0.5)] transition-all duration-500" />
           <span className="text-[15px] font-bold tracking-tight text-white">Proven Protocol</span>
         </Link>
 
