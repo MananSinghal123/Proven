@@ -1,6 +1,5 @@
 // Web3 and contract configurations
-export const UNICHAIN_SEPOLIA_RPC = 'https://sepolia.unichain.org'
-export const SEPOLIA_RPC = 'https://sepolia.infura.io/v3/YOUR_INFURA_KEY'
+export const ETH_SEPOLIA_RPC = 'https://rpc.sepolia.org'
 
 export const POOL_MANAGER_ADDRESS = '0x...' // Replace with actual
 export const VAULT_MANAGER_ADDRESS = '0x...' // Replace with actual

@@ -27,7 +27,7 @@ export function Home() {
             <div className="space-y-8 z-10">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand/8 border border-brand/20">
                 <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
-                <span className="text-sm text-brand/80 font-medium">Live on Unichain Sepolia</span>
+                <span className="text-sm text-brand/80 font-medium">Live on Ethereum Sepolia</span>
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold leading-[1.12] text-white tracking-tight">
@@ -283,7 +283,7 @@ export function Home() {
                 title: 'Prove',
                 icon: Activity,
                 desc: 'Reactive Smart Contracts on Kopli monitor on-chain metrics cross-chain. They evaluate 5 signals every block and compute a composite risk score.',
-                detail: 'Kopli Testnet → Unichain Sepolia',
+                detail: 'Kopli Testnet → Ethereum Sepolia',
               },
               {
                 step: '03',
@@ -321,7 +321,7 @@ export function Home() {
             Ready to launch with confidence?
           </h2>
           <p className="text-white/30 text-base mb-10 max-w-lg mx-auto">
-            Join the teams building trust through performance-vested liquidity on Unichain.
+            Join the teams building trust through performance-vested liquidity on Ethereum Sepolia.
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
             <Link
@@ -352,7 +352,7 @@ export function Home() {
                 <span className="text-sm font-semibold text-white">Proven Protocol</span>
               </div>
               <p className="text-xs text-white/25 leading-relaxed">
-                Performance-vested liquidity for Unichain. Built with Reactive Smart Contracts and Uniswap v4 Hooks.
+                Performance-vested liquidity for Ethereum Sepolia. Built with Reactive Smart Contracts and Uniswap v4 Hooks.
               </p>
             </div>
 
@@ -386,7 +386,7 @@ export function Home() {
           <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row justify-between items-center gap-3 text-[11px] text-white/15">
             <p>© 2025 Proven Protocol. All rights reserved.</p>
             <div className="flex gap-4">
-              <span>Unichain</span>
+              <span>Ethereum Sepolia</span>
               <span>·</span>
               <span>Reactive Network</span>
               <span>·</span>

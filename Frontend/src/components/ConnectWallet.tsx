@@ -74,7 +74,7 @@ export function ConnectWallet() {
               ))}
             <div className="border-t border-white/5 mt-2 pt-2 px-2">
               <p className="text-white/20 text-[10px]">
-                Connecting to Unichain Sepolia
+                Connecting to Ethereum Sepolia
               </p>
             </div>
           </div>

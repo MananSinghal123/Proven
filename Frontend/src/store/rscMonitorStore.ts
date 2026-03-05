@@ -3,7 +3,7 @@ import { create } from 'zustand'
 export interface RSCEvent {
   id: string
   timestamp: number
-  chain: 'ETH_SEPOLIA' | 'UNICHAIN_SEPOLIA'
+  chain: 'ETH_SEPOLIA'
   blockNumber: number
   eventName: string
   fromAddress: string

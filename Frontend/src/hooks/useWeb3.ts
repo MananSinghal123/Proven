@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAccount, useNetwork, useSwitchNetwork } from 'wagmi'
 import { useVerifyStore } from '../store/verifyStore'
 import { useRSCMonitorStore } from '../store/rscMonitorStore'
-import { unichainSepolia } from '../config/wagmi'
+import { ethSepolia } from '../config/wagmi'
 
 /**
  * Wallet connection state helper.
@@ -13,11 +13,11 @@ export const useWallet = () => {
   const { chain } = useNetwork()
   const { switchNetwork } = useSwitchNetwork()
 
-  const isWrongNetwork = isConnected && chain?.id !== unichainSepolia.id
+  const isWrongNetwork = isConnected && chain?.id !== ethSepolia.id
 
   const ensureCorrectNetwork = () => {
     if (isWrongNetwork && switchNetwork) {
-      switchNetwork(unichainSepolia.id)
+      switchNetwork(ethSepolia.id)
     }
   }
 

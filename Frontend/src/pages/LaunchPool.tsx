@@ -80,7 +80,7 @@ export function LaunchPool() {
 
           {/* Token Address */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Token Address (Unichain Sepolia)</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Token Address (Ethereum Sepolia)</label>
             <input
               className="input-glow w-full font-mono"
               placeholder="0x..."
@@ -302,7 +302,7 @@ export function LaunchPool() {
                   </div>
                 </div>
                 {i === 0 && (
-                  <p className="text-white/20 text-xs mt-3 font-mono flex items-center gap-1.5"><Lightbulb className="w-3 h-3 text-brand/40 flex-shrink-0" /> Current Unichain avg pool TVL is $2.1M</p>
+                  <p className="text-white/20 text-xs mt-3 font-mono flex items-center gap-1.5"><Lightbulb className="w-3 h-3 text-brand/40 flex-shrink-0" /> Current Sepolia avg pool TVL is $2.1M</p>
                 )}
                 {i === 1 && (
                   <p className="text-white/20 text-xs mt-3 font-mono flex items-center gap-1.5"><Lightbulb className="w-3 h-3 text-brand/40 flex-shrink-0" /> Top 10% of new launches reach $5M volume in 90 days</p>

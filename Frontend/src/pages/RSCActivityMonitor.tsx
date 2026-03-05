@@ -21,7 +21,7 @@ export function RSCActivityMonitor() {
       const mockEvent: IncomingEvent = {
         id: `event-${Date.now()}`,
         timestamp: Date.now(),
-        chain: Math.random() > 0.5 ? 'ETH_SEPOLIA' : 'UNICHAIN_SEPOLIA',
+        chain: 'ETH_SEPOLIA',
         blockNumber: 5000000 + Math.floor(Math.random() * 100),
         eventName: ['Transfer', 'PoolMetricsUpdated', 'Swap', 'AddLiquidity', 'RemoveLiquidity'][Math.floor(Math.random() * 5)],
         fromAddress: '0x' + Math.random().toString(16).slice(2, 10),
@@ -134,8 +134,8 @@ export function RSCActivityMonitor() {
                   className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-brand/20 transition-all duration-300 animate-fade-up opacity-0"
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`chip ${event.chain === 'UNICHAIN_SEPOLIA' ? 'chip-cyan' : 'chip-purple'} !text-[10px]`}>
-                      {event.chain === 'UNICHAIN_SEPOLIA' ? <span className="inline-flex items-center gap-1"><Link2 className="w-3 h-3" /> UNICHAIN</span> : <span className="inline-flex items-center gap-1"><Link2 className="w-3 h-3" /> ETH</span>}
+                    <span className="chip chip-purple !text-[10px]">
+                      <span className="inline-flex items-center gap-1"><Link2 className="w-3 h-3" /> ETH SEPOLIA</span>
                     </span>
                     <span className="text-white/15 text-[10px] font-mono ml-auto">Block #{event.blockNumber}</span>
                   </div>
@@ -222,7 +222,7 @@ export function RSCActivityMonitor() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {[
-            { step: '01', text: 'On-chain events arrive from Unichain Sepolia', Icon: Mail },
+            { step: '01', text: 'On-chain events arrive from Ethereum Sepolia', Icon: Mail },
             { step: '02', text: 'Kopli RSC evaluates each against 5 signals', Icon: BrainCircuit },
             { step: '03', text: 'Triggered signals dispatch callback transactions', Icon: Zap },
             { step: '04', text: 'Risk scores update, milestones unlock, or locks extend', Icon: RefreshCw },

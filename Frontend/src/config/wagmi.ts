@@ -6,17 +6,17 @@ import { type Chain } from 'wagmi'
 
 /* ═══ Custom Chains ═══ */
 
-export const unichainSepolia: Chain = {
-  id: 1301,
-  name: 'Unichain Sepolia',
-  network: 'unichain-sepolia',
+export const ethSepolia: Chain = {
+  id: 11155111,
+  name: 'Ethereum Sepolia',
+  network: 'sepolia',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://sepolia.unichain.org'] },
-    public: { http: ['https://sepolia.unichain.org'] },
+    default: { http: ['https://rpc.sepolia.org'] },
+    public: { http: ['https://rpc.sepolia.org'] },
   },
   blockExplorers: {
-    default: { name: 'Uniscan', url: 'https://sepolia.uniscan.xyz' },
+    default: { name: 'Etherscan', url: 'https://sepolia.etherscan.io' },
   },
   testnet: true,
 }
@@ -39,7 +39,7 @@ export const kopliTestnet: Chain = {
 /* ═══ Configure chains & providers ═══ */
 
 const { chains, publicClient, webSocketPublicClient } = configureChains(
-  [unichainSepolia, kopliTestnet],
+  [ethSepolia, kopliTestnet],
   [publicProvider()]
 )
 
