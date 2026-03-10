@@ -1,345 +1,253 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useVerifyStore } from '../store/verifyStore'
 import { usePositionData, useRiskScore, useTokenInfo, useHookEventPolling } from '../hooks/useWeb3'
-import { Card } from '../components/Card'
-import { ProgressBar } from '../components/ProgressBar'
-import { Badge } from '../components/Badge'
-import { Search, Siren, Target, ShieldCheck, ScrollText, Copy, Check, Loader2 } from 'lucide-react'
 import { isValidAddress, formatAddress } from '../utils/format'
-import { SIGNAL_LABELS, UNICHAIN_EXPLORER, VESTING_HOOK_ADDRESS } from '../config/constants'
+import { SIGNAL_LABELS } from '../config/constants'
+import { Search, Shield, Activity, AlertTriangle, Clock, Unlock, Lock, ChevronRight, ExternalLink } from 'lucide-react'
 
 export function InvestorDashboard() {
-  const { address: routeAddress } = useParams()
-  const { selectedAddress, setSelectedAddress, poolData, setPoolData, events } = useVerifyStore()
+  const { address: routeAddress } = useParams<{ address: string }>()
+  const navigate = useNavigate()
+  const { selectedAddress, setSelectedAddress, events } = useVerifyStore()
   const [searchInput, setSearchInput] = useState(routeAddress || '')
-  const [copied, setCopied] = useState(false)
 
-  // Resolved team address to query
-  const queryAddr = selectedAddress || routeAddress
-
-  // On-chain hooks
-  const { data: position, loading: posLoading, error: posError } = usePositionData(queryAddr)
-  const { score: riskScore, tier: riskTier } = useRiskScore(queryAddr)
-  const tokenAddr = position?.tokenAddr as `0x${string}` | undefined
+  const teamAddress = selectedAddress || routeAddress
+  const { data: positionData, loading: posLoading, error: posError } = usePositionData(teamAddress || undefined)
+  const { score: riskScore, tier: riskTier } = useRiskScore(teamAddress || undefined)
+  const tokenAddr = positionData?.tokenAddr
   const { info: tokenInfo } = useTokenInfo(
     tokenAddr && tokenAddr !== '0x0000000000000000000000000000000000000000' ? tokenAddr : undefined,
   )
-  const { isPolling } = useHookEventPolling(queryAddr)
-
-  // When position data comes in, map it to the store shape
-  useEffect(() => {
-    if (!position || position.team === '0x0000000000000000000000000000000000000000') {
-      if (!posLoading && queryAddr) setPoolData(null)
-      return
-    }
-
-    const lockUntil = Number(position.lockExtendedUntil)
-    const now = Math.floor(Date.now() / 1000)
-
-    setPoolData({
-      projectName: tokenInfo?.name ?? 'Unknown Project',
-      tokenSymbol: tokenInfo?.symbol ?? '???',
-      tokenAddress: position.tokenAddr,
-      pairToken: 'USDC',
-      feeTier: 0.3,
-      totalLocked: Number(position.lpAmount),
-      currentUnlocked: Math.floor(Number(position.lpAmount) * position.unlockedPct / 100),
-      unlockPercentage: position.unlockedPct,
-      lockExtendedUntil: lockUntil > now ? new Date(lockUntil * 1000).toISOString().split('T')[0] : null,
-      riskScore,
-      milestones: [
-        { condition: 'Milestone 1', currentValue: 0, threshold: 1, unlockAmount: 0, isComplete: false },
-        { condition: 'Milestone 2', currentValue: 0, threshold: 1, unlockAmount: 0, isComplete: false },
-        { condition: 'Milestone 3', currentValue: 0, threshold: 1, unlockAmount: 0, isComplete: false },
-      ],
-      monitoredWallets: [position.team],
-      treasuryAddress: null,
-    })
-  }, [position, tokenInfo, riskScore, posLoading, queryAddr, setPoolData])
-
-  const handleSearch = () => {
-    if (!searchInput || !isValidAddress(searchInput)) return
-    setSelectedAddress(searchInput)
-  }
+  useHookEventPolling(teamAddress || undefined)
 
   useEffect(() => {
     if (routeAddress && isValidAddress(routeAddress)) {
-      setSearchInput(routeAddress)
       setSelectedAddress(routeAddress)
     }
-  }, [routeAddress, setSelectedAddress])
+  }, [routeAddress])
 
-  const handleCopy = () => {
-    const url = `${window.location.origin}/verify/${searchInput}`
-    navigator.clipboard.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleSearch = () => {
+    if (searchInput && isValidAddress(searchInput)) {
+      setSelectedAddress(searchInput)
+      navigate(`/verify/${searchInput}`)
+    }
   }
 
-  const riskColor = (score: number) =>
-    score < 25 ? 'brand' : score < 50 ? 'neon-yellow' : score < 75 ? 'neon-orange' : 'neon-red'
+  const inp = "w-full bg-white dark:bg-[#111] border-4 border-black dark:border-white px-4 py-3 font-mono text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:focus:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] transition-shadow"
 
-  const loading = posLoading
+  const signals = [
+    { id: 'S1', label: SIGNAL_LABELS?.[0] ?? 'LP removal via DEX', icon: Unlock, color: 'bg-[#DFFF00]' },
+    { id: 'S2', label: SIGNAL_LABELS?.[1] ?? 'Treasury drain', icon: AlertTriangle, color: 'bg-[#FF3333] text-white' },
+    { id: 'S3', label: SIGNAL_LABELS?.[2] ?? 'Wallet clustering', icon: Activity, color: 'bg-black text-white dark:bg-white dark:text-black' },
+    { id: 'S4', label: SIGNAL_LABELS?.[3] ?? 'Social silence', icon: Clock, color: 'bg-gray-200 dark:bg-[#1A1A1A]' },
+    { id: 'S5', label: SIGNAL_LABELS?.[4] ?? 'Code mutation', icon: Shield, color: 'bg-[#DFFF00]' },
+  ]
+
+  const getRiskColor = (score: number) => {
+    if (score <= 30) return { bg: 'bg-[#DFFF00]', text: 'text-black', label: 'LOW RISK' }
+    if (score <= 60) return { bg: 'bg-black dark:bg-white', text: 'text-[#DFFF00] dark:text-black', label: 'MEDIUM' }
+    return { bg: 'bg-[#FF3333]', text: 'text-white', label: 'HIGH RISK' }
+  }
+
+  const riskInfo = getRiskColor(riskScore)
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
-      {/* Header + Search */}
-      <div className="mb-12 animate-fade-up opacity-0">
-        <Badge variant="purple" pulse className="mb-4">INVESTOR DASHBOARD</Badge>
-        <h1 className="text-3xl md:text-4xl font-black text-white mb-2">Verify a Project</h1>
-        <p className="text-white/30 mb-8">Paste a team address to check their vesting position</p>
+    <div className="min-h-screen bg-white dark:bg-[#0A0A0A] text-black dark:text-white">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <span className="inline-block bg-black text-[#DFFF00] font-black uppercase text-xs px-4 py-1 border-2 border-black mb-4">INVESTOR FLOW</span>
+          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">Verify Position</h1>
+          <p className="font-mono text-gray-600 dark:text-gray-400 mt-2">Search any team address to inspect their vesting position</p>
+        </div>
 
-        <div className="flex gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+        {/* Search Bar */}
+        <div className="bg-white dark:bg-[#111] border-4 border-black dark:border-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] p-6 mb-10">
+          <label className="block font-bold uppercase tracking-wider text-sm mb-2">Team / Deployer Address</label>
+          <div className="flex gap-3">
             <input
-              className="input-glow w-full !pl-12 font-mono"
-              placeholder="0x... (team wallet address)"
+              className={`${inp} flex-1`}
+              placeholder="0x..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
-          </div>
-          <button className="btn-primary px-8 py-3" onClick={handleSearch} disabled={loading}>
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="animate-spin h-4 w-4" />
-                Searching
-              </span>
-            ) : 'Search'}
-          </button>
-        </div>
-
-        {VESTING_HOOK_ADDRESS === '0x0000000000000000000000000000000000000000' && (
-          <p className="text-neon-orange/60 text-xs mt-3 font-mono">⚠ Hook not deployed — set VITE_HOOK_ADDRESS in .env</p>
-        )}
-      </div>
-
-      {poolData && (
-        <div className="space-y-6">
-          {/* Rage Lock Banner */}
-          {poolData.lockExtendedUntil && (
-            <div className="animate-fade-up opacity-0 p-5 rounded-2xl bg-red-500/5 border border-red-500/30 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500 animate-pulse" />
-              <div className="flex items-start gap-4 ml-4">
-                <Siren className="w-8 h-8 text-red-400 flex-shrink-0" />
-                <div>
-                  <h3 className="font-black text-red-400 text-lg mb-1">RAGE LOCK ACTIVE</h3>
-                  <p className="text-red-200/60 text-sm mb-1">
-                    Lock extended until <span className="text-red-300 font-mono">{poolData.lockExtendedUntil}</span>
-                  </p>
-                  <p className="text-red-200/40 text-sm">
-                    The Reactive Smart Contract triggered a lock extension due to elevated risk signals.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Lock Status Card */}
-          <Card variant="glow" className="!p-8 animate-fade-up opacity-0">
-            <div className="flex items-start justify-between mb-8">
-              <div>
-                <h2 className="text-3xl font-black text-white">{poolData.projectName}</h2>
-                <p className="text-white/30 font-mono text-sm mt-1">${poolData.tokenSymbol} / {poolData.pairToken} · {poolData.feeTier}% fee</p>
-              </div>
-              <Badge
-                variant={poolData.lockExtendedUntil ? 'error' : poolData.unlockPercentage === 100 ? 'success' : 'success'}
-                pulse={!poolData.lockExtendedUntil && poolData.unlockPercentage < 100}
-              >
-                {poolData.lockExtendedUntil ? 'RAGE LOCKED' : poolData.unlockPercentage === 100 ? 'FULLY UNLOCKED' : 'ACTIVE'}
-              </Badge>
-            </div>
-
-            {/* 2x2 Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              {[
-                { label: 'Total LP Locked', value: poolData.totalLocked > 0 ? poolData.totalLocked.toLocaleString() : '0', color: 'text-white', sub: <a href={`${UNICHAIN_EXPLORER}/address/${VESTING_HOOK_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="text-brand/60 hover:text-brand transition">Verify on-chain ↗</a> },
-                { label: 'Currently Unlocked', value: `${poolData.unlockPercentage}%`, color: 'text-brand', sub: `${poolData.currentUnlocked.toLocaleString()} released` },
-                { label: 'Lock Extended', value: poolData.lockExtendedUntil || 'Never', color: 'text-white', sub: poolData.lockExtendedUntil ? 'RSC-triggered extension' : 'No extensions triggered' },
-                { label: 'Risk Score', value: `${poolData.riskScore}/100`, color: `text-${riskColor(poolData.riskScore)}`, sub: poolData.riskScore === 0 ? 'All signals clear' : 'Active signals detected' },
-              ].map((stat, i) => (
-                <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-white/30 mb-2">{stat.label}</p>
-                  <p className={`text-2xl font-black font-mono ${stat.color}`}>{stat.value}</p>
-                  <div className="text-white/20 text-xs mt-1">{stat.sub}</div>
-                </div>
-              ))}
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/30 mb-3">Overall Unlock Progress</p>
-              <ProgressBar value={poolData.unlockPercentage} color="gradient" size="lg" showLabel />
-            </div>
-          </Card>
-
-          {/* Risk Score Panel */}
-          <Card className="!p-8 animate-fade-up opacity-0">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5 text-brand" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">Risk Score Analysis</h3>
-                <p className="text-white/30 text-sm">5-signal composite monitored by Reactive Smart Contracts on Lasna</p>
-              </div>
-            </div>
-
-            {/* Gauge */}
-            <div className="p-6 rounded-xl bg-void-50 border border-white/5 mb-6">
-              <div className="flex items-end justify-between mb-4">
-                <span className="text-white/40 text-sm">Risk Level</span>
-                <span className={`text-4xl font-black font-mono text-${riskColor(poolData.riskScore)}`}>
-                  {poolData.riskScore}
-                </span>
-              </div>
-              <div className="h-3 bg-white/5 rounded-full overflow-hidden relative">
-                <div className="absolute inset-0 flex">
-                  <div className="flex-1 bg-brand/20" />
-                  <div className="flex-1 bg-neon-yellow/20" />
-                  <div className="flex-1 bg-neon-orange/20" />
-                  <div className="flex-1 bg-neon-red/20" />
-                </div>
-                <div
-                  className={`h-full rounded-full relative z-10 transition-all duration-1000 ${
-                    poolData.riskScore < 25 ? 'bg-brand shadow-[0_0_12px_rgba(0,230,118,0.5)]' :
-                    poolData.riskScore < 50 ? 'bg-neon-yellow shadow-[0_0_12px_rgba(234,179,8,0.5)]' :
-                    poolData.riskScore < 75 ? 'bg-neon-orange shadow-[0_0_12px_rgba(249,115,22,0.5)]' :
-                    'bg-neon-red shadow-[0_0_12px_rgba(239,68,68,0.5)]'
-                  }`}
-                  style={{ width: `${Math.max(poolData.riskScore, 2)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-white/20 mt-2 font-mono">
-                <span>0 SAFE</span><span>25</span><span>50</span><span>75</span><span>100 DANGER</span>
-              </div>
-            </div>
-
-            {/* Signal Rows */}
-            <div className="space-y-2">
-              {[0, 1, 2, 3, 4].map((signalId) => {
-                const label = SIGNAL_LABELS[signalId]
-                // In future, read actual signal states from RSC; for now show all as monitoring
-                const isActive = false
-                return (
-                  <div
-                    key={signalId}
-                    className={`p-4 rounded-xl flex items-center justify-between text-sm transition-all duration-300 ${
-                      isActive
-                        ? 'bg-neon-orange/5 border border-neon-orange/20'
-                        : 'bg-white/[0.02] border border-white/5 opacity-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`font-mono text-xs font-bold ${isActive ? 'text-neon-orange' : 'text-white/20'}`}>
-                        S{signalId + 1}
-                      </span>
-                      <span className={isActive ? 'text-white' : 'text-white/30'}>{label}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-white/20 text-xs">{isActive ? 'Active' : 'Monitoring'}</span>
-                      <span className={`font-mono text-xs ${isActive ? 'text-neon-orange' : 'text-white/15'}`}>
-                        {isActive ? '+pts' : '0 pts'}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-
-          {/* Event Log */}
-          <Card className="!p-8 animate-fade-up opacity-0">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center">
-                <ScrollText className="w-5 h-5 text-brand" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">Event Log</h3>
-                <p className="text-white/30 text-sm">
-                  On-chain events for this position
-                  {isPolling && <span className="ml-2 text-brand text-xs">● Live</span>}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {events.length === 0 ? (
-                <div className="text-center py-8">
-                  <ScrollText className="w-8 h-8 text-white/10 mx-auto mb-2" />
-                  <p className="text-white/20 text-sm">No events found yet — events will appear after the first on-chain interaction</p>
-                </div>
-              ) : (
-                events.slice(0, 20).map((event, i) => (
-                  <div key={event.id || i} className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <Badge variant={
-                          event.eventType === 'MilestoneUnlocked' ? 'success' :
-                          event.eventType === 'LockExtended' ? 'error' :
-                          event.eventType === 'RiskElevated' ? 'warning' : 'info'
-                        }>
-                          {event.eventType}
-                        </Badge>
-                        <span className="text-white/20 text-xs font-mono">Block #{event.blockNumber}</span>
-                      </div>
-                      <a
-                        href={`${UNICHAIN_EXPLORER}/tx/${event.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand/40 text-xs font-mono hover:text-brand cursor-pointer transition"
-                      >
-                        {event.txHash.slice(0, 10)}... ↗
-                      </a>
-                    </div>
-                    <p className="text-white/50 text-sm">{event.description}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          {/* Share Button */}
-          <div className="text-center animate-fade-up opacity-0">
-            <button className="btn-primary px-8 py-2.5" onClick={handleCopy}>
-              {copied ? <span className="inline-flex items-center gap-1.5"><Check className="w-4 h-4" /> Copied!</span> : <span className="inline-flex items-center gap-1.5"><Copy className="w-4 h-4" /> Copy Verification Link</span>}
+            <button
+              onClick={handleSearch}
+              className="font-bold uppercase tracking-wide border-4 border-black px-8 py-3 bg-[#DFFF00] text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:translate-x-0 active:shadow-none transition-all flex items-center gap-2"
+            >
+              <Search className="w-5 h-5 stroke-[3]" />
+              SEARCH
             </button>
           </div>
         </div>
-      )}
 
-      {/* Loading State */}
-      {loading && queryAddr && (
-        <Card className="!p-12 text-center animate-fade-up opacity-0">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="animate-spin h-8 w-8 text-brand" />
-            <p className="text-white/30">Reading on-chain data from Unichain Sepolia...</p>
+        {/* Loading */}
+        {posLoading && (
+          <div className="border-4 border-black dark:border-white p-12 text-center mb-8">
+            <div className="inline-block w-8 h-8 border-4 border-black dark:border-white border-t-[#DFFF00] rounded-full animate-spin mb-4" />
+            <p className="font-mono text-gray-600 dark:text-gray-400">Reading on-chain position...</p>
           </div>
-        </Card>
-      )}
+        )}
 
-      {/* Not Found */}
-      {!loading && queryAddr && !poolData && posError && (
-        <Card className="!p-12 text-center animate-fade-up opacity-0">
-          <div className="flex flex-col items-center gap-4">
-            <Search className="w-12 h-12 text-white/10" />
-            <p className="text-white/30 text-lg">No position found for this address</p>
-            <p className="text-white/15 text-sm font-mono">{posError}</p>
+        {/* Error */}
+        {posError && (
+          <div className="border-4 border-[#FF3333] p-6 mb-8 dark:bg-[#111]">
+            <p className="text-[#FF3333] font-mono font-bold">{posError}</p>
           </div>
-        </Card>
-      )}
+        )}
 
-      {/* Empty State */}
-      {!queryAddr && (
-        <Card className="!p-16 text-center animate-fade-up opacity-0">
-          <div className="flex flex-col items-center gap-4">
-            <Search className="w-12 h-12 text-white/10" />
-            <p className="text-white/30 text-lg">Enter a team address to begin verification</p>
-            <p className="text-white/15 text-sm">Paste the team wallet address that registered the vesting position</p>
+        {/* Position Data */}
+        {positionData && !posLoading && (
+          <div className="space-y-8">
+            {/* Top Row: Position + Risk */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Position Card */}
+              <div className="md:col-span-2 bg-white dark:bg-[#111] border-4 border-black dark:border-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] p-6">
+                <h3 className="font-black uppercase text-lg border-b-4 border-black dark:border-white pb-3 mb-5 flex items-center gap-2">
+                  <Lock className="w-5 h-5" /> Position Data
+                </h3>
+                <div className="space-y-4 font-mono text-sm">
+                  <div className="flex justify-between items-center border-b-2 border-gray-200 dark:border-gray-700 pb-2">
+                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-bold font-sans">Team</span>
+                    <span className="font-bold">{formatAddress(positionData.team)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b-2 border-gray-200 dark:border-gray-700 pb-2">
+                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-bold font-sans">Token</span>
+                    <span className="font-bold">{tokenInfo?.symbol ?? formatAddress(positionData.tokenAddr)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b-2 border-gray-200 dark:border-gray-700 pb-2">
+                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-bold font-sans">LP Locked</span>
+                    <span className="font-black text-lg">{positionData.lpAmount.toString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b-2 border-gray-200 dark:border-gray-700 pb-2">
+                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-bold font-sans">Registered</span>
+                    <span>{positionData.registeredAt > 0n ? new Date(Number(positionData.registeredAt) * 1000).toLocaleDateString() : '—'}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b-2 border-gray-200 dark:border-gray-700 pb-2">
+                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-bold font-sans">Lock Extended Until</span>
+                    <span className={positionData.lockExtendedUntil > 0n ? 'text-[#FF3333] font-bold' : ''}>
+                      {positionData.lockExtendedUntil > 0n ? new Date(Number(positionData.lockExtendedUntil) * 1000).toLocaleDateString() : 'No extension'}
+                    </span>
+                  </div>
+
+                  {/* Unlock Bar */}
+                  <div className="pt-2">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-bold font-sans">Unlocked</span>
+                      <span className="font-black text-lg">{positionData.unlockedPct}%</span>
+                    </div>
+                    <div className="h-8 border-4 border-black dark:border-white bg-gray-200 dark:bg-[#1A1A1A] overflow-hidden">
+                      <div
+                        className="h-full bg-[#DFFF00] transition-all duration-700"
+                        style={{ width: `${positionData.unlockedPct}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs mt-1 text-gray-400">
+                      <span>0%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Risk Score Card */}
+              <div className="bg-white dark:bg-[#111] border-4 border-black dark:border-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] p-6 flex flex-col">
+                <h3 className="font-black uppercase text-lg border-b-4 border-black dark:border-white pb-3 mb-5 flex items-center gap-2">
+                  <Shield className="w-5 h-5" /> RSC Score
+                </h3>
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <div className={`w-32 h-32 border-4 border-black dark:border-white ${riskInfo.bg} ${riskInfo.text} flex flex-col items-center justify-center`}>
+                    <span className="font-black text-4xl">{riskScore}</span>
+                    <span className="text-xs font-bold uppercase">/100</span>
+                  </div>
+                  <div className={`mt-4 px-4 py-1 border-4 border-black dark:border-white font-black uppercase text-sm ${riskInfo.bg} ${riskInfo.text}`}>
+                    {riskInfo.label}
+                  </div>
+                  {riskTier > 0 && (
+                    <p className="mt-3 font-mono text-xs text-gray-500 dark:text-gray-400">
+                      Dispatched Tier: <span className="font-black">{riskTier}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 5-Signal Grid */}
+            <div className="bg-white dark:bg-[#111] border-4 border-black dark:border-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] p-6">
+              <h3 className="font-black uppercase text-lg border-b-4 border-black dark:border-white pb-3 mb-5 flex items-center gap-2">
+                <Activity className="w-5 h-5" /> 5-Signal Detection
+              </h3>
+              <div className="space-y-3">
+                {signals.map((sig) => (
+                  <div key={sig.id} className="flex items-center gap-4 p-4 border-4 border-black dark:border-white hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] transition-all">
+                    <div className={`w-12 h-12 border-4 border-black ${sig.color} flex items-center justify-center`}>
+                      <sig.icon className="w-5 h-5 stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm">{sig.id}</span>
+                        <span className="font-mono text-sm">{sig.label}</span>
+                      </div>
+                    </div>
+                    <span className="font-mono text-xs px-3 py-1 border-2 border-black dark:border-white bg-gray-100 dark:bg-[#1A1A1A]">MONITORING</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Event Log */}
+            <div className="bg-white dark:bg-[#111] border-4 border-black dark:border-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] p-6">
+              <h3 className="font-black uppercase text-lg border-b-4 border-black dark:border-white pb-3 mb-5 flex items-center gap-2">
+                <Clock className="w-5 h-5" /> Event Log
+                {events.length > 0 && (
+                  <span className="ml-auto bg-black text-[#DFFF00] font-mono text-xs px-3 py-1">{events.length} EVENTS</span>
+                )}
+              </h3>
+              {events.length === 0 ? (
+                <div className="border-4 border-dashed border-gray-300 dark:border-gray-600 p-8 text-center">
+                  <p className="font-mono text-gray-400">No events detected yet.</p>
+                  <p className="font-mono text-gray-400 text-xs mt-1">Polling VestingHook on Unichain Sepolia...</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {events.map((evt) => (
+                    <div key={evt.id} className="p-3 border-4 border-black dark:border-white flex items-center gap-3 font-mono text-xs hover:bg-gray-50 dark:hover:bg-[#1A1A1A] transition">
+                      <span className={`shrink-0 w-3 h-3 border-2 border-black dark:border-white ${
+                        evt.eventType === 'RiskElevated' || evt.eventType === 'LockExtended'
+                          ? 'bg-[#FF3333]'
+                          : evt.eventType === 'MilestoneUnlocked'
+                          ? 'bg-[#DFFF00]'
+                          : 'bg-gray-300 dark:bg-gray-600'
+                      }`} />
+                      <span className="font-black shrink-0 w-40 uppercase text-[10px]">{evt.eventType}</span>
+                      <span className="flex-1 truncate text-gray-600 dark:text-gray-400">{evt.description}</span>
+                      <span className="shrink-0 text-gray-400">
+                        {new Date(evt.timestamp).toLocaleTimeString()}
+                      </span>
+                      {evt.txHash && (
+                        <a href={`https://sepolia.uniscan.xyz/tx/${evt.txHash}`} target="_blank" rel="noopener noreferrer" className="shrink-0 hover:text-[#DFFF00]">
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </Card>
-      )}
+        )}
+
+        {/* Empty State */}
+        {!teamAddress && !posLoading && (
+          <div className="border-4 border-dashed border-gray-300 dark:border-gray-600 p-16 text-center">
+            <Search className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600 stroke-[1.5]" />
+            <p className="font-black uppercase text-xl text-gray-300 dark:text-gray-600 mb-2">No Address Selected</p>
+            <p className="font-mono text-gray-400 text-sm">Enter a team address above to view their vesting position</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

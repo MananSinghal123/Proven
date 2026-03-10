@@ -36,13 +36,13 @@
     font-size: 16px;
   }
   body {
-    @apply bg-void text-white antialiased;
+    @apply bg-white text-black dark:bg-[#0A0A0A] dark:text-white antialiased;
     font-family: 'Inter', system-ui, sans-serif;
     overflow-x: hidden;
   }
   ::selection {
-    background: rgba(0, 230, 118, 0.25);
-    color: #fff;
+    background: #DFFF00;
+    color: #000;
   }
 
   /* Typography defaults */

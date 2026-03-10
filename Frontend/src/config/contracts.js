@@ -191,22 +191,64 @@ export const timeLockRSCAbi = [
     // ── reads ──
     {
         type: 'function',
-        name: 'compositeScore',
-        inputs: [{ name: '', type: 'address' }],
+        name: 'getRiskScore',
+        inputs: [{ name: 'team', type: 'address' }],
         outputs: [{ name: '', type: 'uint16' }],
         stateMutability: 'view',
     },
     {
         type: 'function',
-        name: 'lastDispatchedTier',
-        inputs: [{ name: '', type: 'address' }],
+        name: 'getLastDispatchedTier',
+        inputs: [{ name: 'team', type: 'address' }],
         outputs: [{ name: '', type: 'uint8' }],
+        stateMutability: 'view',
+    },
+    {
+        type: 'function',
+        name: 'getTotalUnlockedPct',
+        inputs: [{ name: 'team', type: 'address' }],
+        outputs: [{ name: '', type: 'uint8' }],
+        stateMutability: 'view',
+    },
+    {
+        type: 'function',
+        name: 'getTeamLPLocked',
+        inputs: [{ name: 'team', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+    },
+    {
+        type: 'function',
+        name: 'getPoolTeam',
+        inputs: [{ name: 'poolId', type: 'bytes32' }],
+        outputs: [{ name: '', type: 'address' }],
+        stateMutability: 'view',
+    },
+    {
+        type: 'function',
+        name: 'totalReactCalls',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+    },
+    {
+        type: 'function',
+        name: 'totalCallbacks',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint256' }],
         stateMutability: 'view',
     },
     {
         type: 'function',
         name: 'walletToTeam',
         inputs: [{ name: '', type: 'address' }],
+        outputs: [{ name: '', type: 'address' }],
+        stateMutability: 'view',
+    },
+    {
+        type: 'function',
+        name: 'OWNER',
+        inputs: [],
         outputs: [{ name: '', type: 'address' }],
         stateMutability: 'view',
     },
@@ -280,6 +322,64 @@ export const timeLockRSCAbi = [
             { name: 'gas_limit', type: 'uint64', indexed: true },
             { name: 'payload', type: 'bytes', indexed: false },
         ],
+    },
+];
+/* ─── PoolManager (Uniswap v4 — initialize) ─── */
+export const poolManagerAbi = [
+    {
+        type: 'function',
+        name: 'initialize',
+        inputs: [
+            {
+                name: 'key',
+                type: 'tuple',
+                components: [
+                    { name: 'currency0', type: 'address' },
+                    { name: 'currency1', type: 'address' },
+                    { name: 'fee', type: 'uint24' },
+                    { name: 'tickSpacing', type: 'int24' },
+                    { name: 'hooks', type: 'address' },
+                ],
+            },
+            { name: 'sqrtPriceX96', type: 'uint160' },
+        ],
+        outputs: [{ name: 'tick', type: 'int24' }],
+        stateMutability: 'nonpayable',
+    },
+];
+/* ─── PoolModifyLiquidityTest (Uniswap v4 — add liquidity via test router) ─── */
+export const poolModifyLiquidityTestAbi = [
+    {
+        type: 'function',
+        name: 'modifyLiquidity',
+        inputs: [
+            {
+                name: 'key',
+                type: 'tuple',
+                components: [
+                    { name: 'currency0', type: 'address' },
+                    { name: 'currency1', type: 'address' },
+                    { name: 'fee', type: 'uint24' },
+                    { name: 'tickSpacing', type: 'int24' },
+                    { name: 'hooks', type: 'address' },
+                ],
+            },
+            {
+                name: 'params',
+                type: 'tuple',
+                components: [
+                    { name: 'tickLower', type: 'int24' },
+                    { name: 'tickUpper', type: 'int24' },
+                    { name: 'liquidityDelta', type: 'int256' },
+                    { name: 'salt', type: 'bytes32' },
+                ],
+            },
+            { name: 'hookData', type: 'bytes' },
+        ],
+        outputs: [
+            { name: 'delta', type: 'int256' },
+        ],
+        stateMutability: 'payable',
     },
 ];
 /* ─── ERC-20 (minimal for token reads) ─── */

@@ -1,82 +1,63 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAccount, useConnect, useDisconnect, useNetwork } from 'wagmi'
-import { Wallet, Copy, ExternalLink, LogOut } from 'lucide-react'
+import { Wallet, ChevronDown, Copy, ExternalLink, LogOut, Check } from 'lucide-react'
+import { UNICHAIN_EXPLORER, UNICHAIN_SEPOLIA_CHAIN_ID, LASNA_CHAIN_ID, LASNA_EXPLORER } from '../config/constants'
 
 export function ConnectWallet() {
   const { address, isConnected } = useAccount()
-  const { connect, connectors, isLoading, pendingConnector } = useConnect()
+  const { connect, connectors, isLoading: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
   const { chain } = useNetwork()
-
   const [showDropdown, setShowDropdown] = useState(false)
-  const [showConnectors, setShowConnectors] = useState(false)
+  const [copied, setCopied] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handle = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowDropdown(false)
-        setShowConnectors(false)
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
   }, [])
 
-  const formatAddress = (addr: string) =>
-    `${addr.slice(0, 6)}...${addr.slice(-4)}`
+  const handleCopy = () => {
+    if (address) {
+      navigator.clipboard.writeText(address)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+  }
+
+  const explorer = chain?.id === LASNA_CHAIN_ID ? LASNA_EXPLORER : UNICHAIN_EXPLORER
 
   if (!isConnected) {
     return (
       <div className="relative" ref={dropdownRef}>
         <button
-          className="px-5 py-2 rounded-lg border border-brand/30 bg-brand/10 text-brand text-sm font-semibold hover:bg-brand/20 hover:border-brand/50 transition-all duration-200"
-          onClick={() => setShowConnectors(!showConnectors)}
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="font-bold uppercase tracking-wide border-4 border-black px-5 py-2 bg-[#DFFF00] text-black text-sm shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:translate-x-0 active:shadow-none transition-all flex items-center gap-2"
         >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="60" strokeDashoffset="20" />
-              </svg>
-              Connecting...
-            </span>
-          ) : (
-            'Connect Wallet'
-          )}
+          <Wallet className="w-4 h-4 stroke-[2.5]" />
+          {isConnecting ? 'CONNECTING...' : 'CONNECT'}
         </button>
 
-        {showConnectors && (
-          <div className="absolute top-full right-0 mt-2 w-64 rounded-xl border border-surface-border bg-surface p-3 space-y-1.5 z-50 shadow-xl">
-            <p className="text-white/40 text-[10px] font-semibold uppercase tracking-widest px-2 py-1">
-              Select Wallet
-            </p>
-            {connectors
-              .filter((c) => c.ready)
-              .map((connector) => (
-                <button
-                  key={connector.id}
-                  onClick={() => {
-                    connect({ connector })
-                    setShowConnectors(false)
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                    <Wallet className="w-4 h-4 text-brand" />
-                  </div>
-                  <div>
-                    <div className="font-semibold">{connector.name}</div>
-                    {isLoading && pendingConnector?.id === connector.id && (
-                      <div className="text-brand text-xs">Connecting...</div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            <div className="border-t border-white/5 mt-2 pt-2 px-2">
-              <p className="text-white/20 text-[10px]">
-                Connecting to Unichain Sepolia
-              </p>
+        {showDropdown && (
+          <div className="absolute right-0 top-full mt-2 w-56 border-4 border-black dark:border-white bg-white dark:bg-[#111] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] z-50">
+            <div className="p-3 border-b-4 border-black dark:border-white bg-gray-100 dark:bg-[#1A1A1A]">
+              <span className="font-black uppercase text-xs">Select Wallet</span>
             </div>
+            {connectors.map((connector) => (
+              <button
+                key={connector.id}
+                onClick={() => { connect({ connector }); setShowDropdown(false) }}
+                className="w-full text-left px-4 py-3 font-mono text-sm font-bold hover:bg-[#DFFF00] hover:text-black border-b-2 border-gray-200 dark:border-gray-700 last:border-0 transition-colors flex items-center gap-2"
+              >
+                <span className="w-2 h-2 bg-black dark:bg-white shrink-0" />
+                {connector.name}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -87,76 +68,39 @@ export function ConnectWallet() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-brand/20 bg-brand/5 hover:bg-brand/10 transition-all duration-300"
+        className="border-4 border-black dark:border-white px-4 py-2 bg-white dark:bg-[#111] text-black dark:text-white text-sm font-mono font-bold shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] dark:shadow-[3px_3px_0px_0px_rgba(255,255,255,1)] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[5px_5px_0px_0px_rgba(255,255,255,1)] active:translate-y-0 active:shadow-none transition-all flex items-center gap-2"
       >
-        <div className="relative">
-          <div className="w-2 h-2 rounded-full bg-brand" />
-          <div className="absolute inset-0 w-2 h-2 rounded-full bg-brand animate-ping opacity-40" />
-        </div>
-
-        <span className="text-[10px] font-mono font-bold text-brand/60 uppercase">
-          {chain?.name?.slice(0, 5) || 'NET'}
-        </span>
-
-        <span className="text-xs font-mono text-white/80">
-          {formatAddress(address!)}
-        </span>
-
-        <svg
-          className={`w-3 h-3 text-white/30 transition-transform ${showDropdown ? 'rotate-180' : ''}`}
-          viewBox="0 0 12 12"
-          fill="none"
-        >
-          <path d="M3 5L6 8L9 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
+        <span className={`w-2 h-2 border-2 border-black dark:border-white ${chain?.id === UNICHAIN_SEPOLIA_CHAIN_ID ? 'bg-[#DFFF00]' : chain?.id === LASNA_CHAIN_ID ? 'bg-black dark:bg-white' : 'bg-[#FF3333]'}`} />
+        {address?.slice(0, 6)}...{address?.slice(-4)}
+        <ChevronDown className="w-3 h-3 stroke-[3]" />
       </button>
 
       {showDropdown && (
-        <div className="absolute top-full right-0 mt-2 w-72 rounded-xl border border-surface-border bg-surface p-4 z-50 shadow-xl">
-          <div className="mb-3 pb-3 border-b border-white/5">
-            <p className="text-white/30 text-[10px] font-semibold uppercase tracking-widest mb-2">Connected</p>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-brand/20 border border-brand/30 flex items-center justify-center">
-                <span className="text-brand text-xs font-bold">{address?.slice(2, 4).toUpperCase()}</span>
-              </div>
-              <div>
-                <p className="text-white font-mono text-sm">{formatAddress(address!)}</p>
-                <p className="text-white/20 text-xs">{chain?.name || 'Unknown Chain'}</p>
-              </div>
-            </div>
+        <div className="absolute right-0 top-full mt-2 w-56 border-4 border-black dark:border-white bg-white dark:bg-[#111] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] z-50">
+          <div className="p-3 border-b-4 border-black dark:border-white bg-gray-100 dark:bg-[#1A1A1A]">
+            <span className="font-mono text-xs font-bold">{address?.slice(0, 12)}...{address?.slice(-6)}</span>
+            {chain && <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 mt-0.5">{chain.name}</p>}
           </div>
 
-          <div className="space-y-1">
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(address!)
-                setShowDropdown(false)
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/5 transition-all"
-            >
-              <Copy className="w-4 h-4" /> Copy Address
-            </button>
+          <button onClick={handleCopy} className="w-full text-left px-4 py-3 font-mono text-sm font-bold hover:bg-[#DFFF00] hover:text-black border-b-2 border-gray-200 dark:border-gray-700 transition-colors flex items-center gap-2">
+            {copied ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Copy className="w-4 h-4 stroke-[2]" />}
+            {copied ? 'Copied!' : 'Copy Address'}
+          </button>
 
-            <a
-              href={`${chain?.blockExplorers?.default?.url ?? 'https://sepolia.uniscan.xyz'}/address/${address}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/5 transition-all"
-              onClick={() => setShowDropdown(false)}
-            >
-              <ExternalLink className="w-4 h-4" /> View on Explorer
-            </a>
+          <a
+            href={`${explorer}/address/${address}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full text-left px-4 py-3 font-mono text-sm font-bold hover:bg-[#DFFF00] hover:text-black border-b-2 border-gray-200 dark:border-gray-700 transition-colors flex items-center gap-2"
+          >
+            <ExternalLink className="w-4 h-4 stroke-[2]" />
+            View Explorer
+          </a>
 
-            <button
-              onClick={() => {
-                disconnect()
-                setShowDropdown(false)
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-400/70 hover:text-red-400 hover:bg-red-500/5 transition-all"
-            >
-              <LogOut className="w-4 h-4" /> Disconnect
-            </button>
-          </div>
+          <button onClick={() => { disconnect(); setShowDropdown(false) }} className="w-full text-left px-4 py-3 font-mono text-sm font-bold text-[#FF3333] hover:bg-[#FF3333] hover:text-white transition-colors flex items-center gap-2">
+            <LogOut className="w-4 h-4 stroke-[2]" />
+            Disconnect
+          </button>
         </div>
       )}
     </div>

@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAccount, useNetwork, useSwitchNetwork, usePublicClient, useWalletClient } from 'wagmi';
+import { getWalletClient as getCoreWalletClient, getPublicClient as getCorePublicClient } from '@wagmi/core';
 import { createPublicClient, http } from 'viem';
 import { useVerifyStore } from '../store/verifyStore';
 import { useRSCMonitorStore } from '../store/rscMonitorStore';
 import { unichainSepolia, lasnaTestnet } from '../config/wagmi';
-import { vestingHookAbi, timeLockRSCAbi, erc20Abi } from '../config/contracts';
-import { VESTING_HOOK_ADDRESS, TIMELOCK_RSC_ADDRESS, LASNA_RPC, UNICHAIN_RPC, CONDITION_TYPE_MAP, } from '../config/constants';
+import { vestingHookAbi, timeLockRSCAbi, erc20Abi, poolManagerAbi, poolModifyLiquidityTestAbi } from '../config/contracts';
+import { VESTING_HOOK_ADDRESS, TIMELOCK_RSC_ADDRESS, LASNA_RPC, UNICHAIN_RPC, CONDITION_TYPE_MAP, POOL_MANAGER_ADDRESS, POOL_MODIFY_LIQUIDITY_TEST_ADDRESS, } from '../config/constants';
 /* ═══════════════════════════════════════════════════════════════════════════════
  *  1. Wallet connection helper
  * ═══════════════════════════════════════════════════════════════════════════════ */
@@ -142,13 +143,13 @@ export const useRiskScore = (teamAddress) => {
                     lasnaClient.readContract({
                         address: TIMELOCK_RSC_ADDRESS,
                         abi: timeLockRSCAbi,
-                        functionName: 'compositeScore',
+                        functionName: 'getRiskScore',
                         args: [addr],
                     }),
                     lasnaClient.readContract({
                         address: TIMELOCK_RSC_ADDRESS,
                         abi: timeLockRSCAbi,
-                        functionName: 'lastDispatchedTier',
+                        functionName: 'getLastDispatchedTier',
                         args: [addr],
                     }),
                 ]);
@@ -285,6 +286,7 @@ export const useRSCEventPolling = (projectAddress, pollInterval = 15000) => {
 export const useContractWrites = () => {
     const { data: walletClient } = useWalletClient();
     const publicClient = usePublicClient();
+    const { switchNetworkAsync } = useSwitchNetwork();
     /** Register vesting position on VestingHook (Unichain Sepolia) */
     const registerVestingPosition = useCallback(async (milestones, tokenAddress, poolId) => {
         if (!walletClient)
@@ -313,12 +315,15 @@ export const useContractWrites = () => {
         return receipt;
     }, [walletClient, publicClient]);
     /** Register milestones on TimeLockRSC (Lasna Testnet)
-     *  Note: This requires the user to switch to Lasna or use a relayer.
-     *  For now we prepare the TX data; the frontend should prompt a chain switch.
+     *  IMPORTANT: Caller must switch to Lasna chain first via switchToLasna().
+     *  This function fetches a fresh wallet client for the Lasna chain.
      */
     const registerMilestonesOnRSC = useCallback(async (poolId, teamAddress, milestones) => {
-        if (!walletClient)
-            throw new Error('Wallet not connected');
+        // Get a fresh wallet client for the currently connected chain (should be Lasna after switch)
+        const wc = await getCoreWalletClient({ chainId: lasnaTestnet.id });
+        if (!wc)
+            throw new Error('Wallet not connected to Lasna');
+        const pc = getCorePublicClient({ chainId: lasnaTestnet.id });
         const conditionTypes = [0n, 0n, 0n];
         const thresholds = [0n, 0n, 0n];
         const unlockPcts = [0, 0, 0];
@@ -327,31 +332,102 @@ export const useContractWrites = () => {
             thresholds[i] = BigInt(m.threshold);
             unlockPcts[i] = m.unlockPercentage;
         });
-        const hash = await walletClient.writeContract({
+        const hash = await wc.writeContract({
             address: TIMELOCK_RSC_ADDRESS,
             abi: timeLockRSCAbi,
             functionName: 'registerMilestones',
             args: [poolId, teamAddress, conditionTypes, thresholds, unlockPcts],
+            chain: lasnaTestnet,
         });
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        const receipt = await pc.waitForTransactionReceipt({ hash });
         return receipt;
-    }, [walletClient, publicClient]);
-    /** Add genesis wallet on TimeLockRSC (Lasna) */
+    }, []);
+    /** Add genesis wallet on TimeLockRSC (Lasna)
+     *  IMPORTANT: Caller must switch to Lasna chain first via switchToLasna().
+     */
     const addGenesisWallet = useCallback(async (teamAddress, walletAddress) => {
-        if (!walletClient)
-            throw new Error('Wallet not connected');
-        const hash = await walletClient.writeContract({
+        const wc = await getCoreWalletClient({ chainId: lasnaTestnet.id });
+        if (!wc)
+            throw new Error('Wallet not connected to Lasna');
+        const pc = getCorePublicClient({ chainId: lasnaTestnet.id });
+        const hash = await wc.writeContract({
             address: TIMELOCK_RSC_ADDRESS,
             abi: timeLockRSCAbi,
             functionName: 'addGenesisWallet',
             args: [teamAddress, walletAddress],
+            chain: lasnaTestnet,
+        });
+        const receipt = await pc.waitForTransactionReceipt({ hash });
+        return receipt;
+    }, []);
+    /** Approve a token for spending by the PoolModifyLiquidityTest router */
+    const approveToken = useCallback(async (tokenAddress, spender, amount) => {
+        if (!walletClient)
+            throw new Error('Wallet not connected');
+        const hash = await walletClient.writeContract({
+            address: tokenAddress,
+            abi: erc20Abi,
+            functionName: 'approve',
+            args: [spender, amount],
         });
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
         return receipt;
     }, [walletClient, publicClient]);
+    /** Initialize a Uniswap v4 pool on the PoolManager */
+    const initializePool = useCallback(async (poolKey, sqrtPriceX96) => {
+        if (!walletClient)
+            throw new Error('Wallet not connected');
+        const hash = await walletClient.writeContract({
+            address: POOL_MANAGER_ADDRESS,
+            abi: poolManagerAbi,
+            functionName: 'initialize',
+            args: [poolKey, sqrtPriceX96],
+        });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        return receipt;
+    }, [walletClient, publicClient]);
+    /** Add liquidity via PoolModifyLiquidityTest (triggers afterAddLiquidity hook) */
+    const addLiquidity = useCallback(async (poolKey, tickLower, tickUpper, liquidityDelta) => {
+        if (!walletClient)
+            throw new Error('Wallet not connected');
+        const hash = await walletClient.writeContract({
+            address: POOL_MODIFY_LIQUIDITY_TEST_ADDRESS,
+            abi: poolModifyLiquidityTestAbi,
+            functionName: 'modifyLiquidity',
+            args: [
+                poolKey,
+                {
+                    tickLower,
+                    tickUpper,
+                    liquidityDelta,
+                    salt: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                },
+                '0x',
+            ],
+        });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        return receipt;
+    }, [walletClient, publicClient]);
+    /** Switch wallet to Lasna testnet (5318007) for RSC interactions */
+    const switchToLasna = useCallback(async () => {
+        if (!switchNetworkAsync)
+            throw new Error('switchNetwork not available');
+        await switchNetworkAsync(lasnaTestnet.id);
+    }, [switchNetworkAsync]);
+    /** Switch wallet back to Unichain Sepolia (1301) */
+    const switchToUnichain = useCallback(async () => {
+        if (!switchNetworkAsync)
+            throw new Error('switchNetwork not available');
+        await switchNetworkAsync(unichainSepolia.id);
+    }, [switchNetworkAsync]);
     return {
         registerVestingPosition,
         registerMilestonesOnRSC,
         addGenesisWallet,
+        approveToken,
+        initializePool,
+        addLiquidity,
+        switchToLasna,
+        switchToUnichain,
     };
 };
