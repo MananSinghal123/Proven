@@ -65,6 +65,9 @@ const lasnaClient = createPublicClient({
   transport: http(LASNA_RPC),
 })
 
+/** Small delay so MetaMask's internal nonce tracker can catch up between sequential TXs */
+const nonceSafeWait = (ms = 2500) => new Promise((r) => setTimeout(r, ms))
+
 /* ═══════════════════════════════════════════════════════════════════════════════
  *  3. Token metadata reader
  * ═══════════════════════════════════════════════════════════════════════════════ */
@@ -391,6 +394,7 @@ export const useContractWrites = () => {
       })
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash })
+      await nonceSafeWait()
       return receipt
     },
     [walletClient, publicClient],
@@ -430,6 +434,7 @@ export const useContractWrites = () => {
       })
 
       const receipt = await pc.waitForTransactionReceipt({ hash })
+      await nonceSafeWait()
       return receipt
     },
     [],
@@ -453,6 +458,7 @@ export const useContractWrites = () => {
       })
 
       const receipt = await pc.waitForTransactionReceipt({ hash })
+      await nonceSafeWait()
       return receipt
     },
     [],
@@ -471,6 +477,7 @@ export const useContractWrites = () => {
       })
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash })
+      await nonceSafeWait()
       return receipt
     },
     [walletClient, publicClient],
@@ -489,6 +496,7 @@ export const useContractWrites = () => {
       })
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash })
+      await nonceSafeWait()
       return receipt
     },
     [walletClient, publicClient],
@@ -521,6 +529,7 @@ export const useContractWrites = () => {
       })
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash })
+      await nonceSafeWait()
       return receipt
     },
     [walletClient, publicClient],

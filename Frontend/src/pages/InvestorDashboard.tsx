@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useVerifyStore } from '../store/verifyStore'
-import { usePositionData, useRiskScore, useTokenInfo, useHookEventPolling } from '../hooks/useWeb3'
+import { useWallet, usePositionData, useRiskScore, useTokenInfo, useHookEventPolling } from '../hooks/useWeb3'
 import { isValidAddress, formatAddress } from '../utils/format'
-import { SIGNAL_LABELS } from '../config/constants'
-import { Search, Shield, Activity, AlertTriangle, Clock, Unlock, Lock, ChevronRight, ExternalLink } from 'lucide-react'
+import { SIGNAL_LABELS, UNICHAIN_EXPLORER } from '../config/constants'
+import { Search, Shield, Activity, AlertTriangle, Clock, Unlock, Lock, ChevronRight, ExternalLink, Rocket, Wallet, Eye } from 'lucide-react'
 
 export function InvestorDashboard() {
   const { address: routeAddress } = useParams<{ address: string }>()
@@ -12,14 +12,36 @@ export function InvestorDashboard() {
   const { selectedAddress, setSelectedAddress, events } = useVerifyStore()
   const [searchInput, setSearchInput] = useState(routeAddress || '')
 
-  const teamAddress = selectedAddress || routeAddress
-  const { data: positionData, loading: posLoading, error: posError } = usePositionData(teamAddress || undefined)
-  const { score: riskScore, tier: riskTier } = useRiskScore(teamAddress || undefined)
+  /* ── Connected wallet ── */
+  const { address: connectedAddress, isConnected } = useWallet()
+
+  /* ── View address = searched or route ── */
+  const viewAddress = selectedAddress || routeAddress
+
+  /* ── Auto-load connected wallet's position ── */
+  const { data: myPositionData, loading: myPosLoading } = usePositionData(
+    isConnected && connectedAddress ? (connectedAddress as `0x${string}`) : undefined,
+  )
+  const myTokenAddr = myPositionData?.tokenAddr
+  const { info: myTokenInfo } = useTokenInfo(
+    myTokenAddr && myTokenAddr !== '0x0000000000000000000000000000000000000000' ? myTokenAddr : undefined,
+  )
+  const { score: myRiskScore } = useRiskScore(
+    isConnected && connectedAddress ? connectedAddress : undefined,
+  )
+
+  /* ── Searched address position ── */
+  const { data: positionData, loading: posLoading, error: posError } = usePositionData(viewAddress || undefined)
+  const { score: riskScore, tier: riskTier } = useRiskScore(viewAddress || undefined)
   const tokenAddr = positionData?.tokenAddr
   const { info: tokenInfo } = useTokenInfo(
     tokenAddr && tokenAddr !== '0x0000000000000000000000000000000000000000' ? tokenAddr : undefined,
   )
-  useHookEventPolling(teamAddress || undefined)
+  useHookEventPolling(viewAddress || undefined)
+
+  /* ── Has a valid launched pool? ── */
+  const hasMyPool = myPositionData && myPositionData.team !== '0x0000000000000000000000000000000000000000' && myPositionData.registeredAt > 0n
+  const isViewingSelf = viewAddress?.toLowerCase() === connectedAddress?.toLowerCase()
 
   useEffect(() => {
     if (routeAddress && isValidAddress(routeAddress)) {
@@ -27,10 +49,27 @@ export function InvestorDashboard() {
     }
   }, [routeAddress])
 
+  /* ── Auto-navigate to own pool when connected and no route address ── */
+  useEffect(() => {
+    if (isConnected && connectedAddress && hasMyPool && !routeAddress && !selectedAddress) {
+      setSelectedAddress(connectedAddress)
+      setSearchInput(connectedAddress)
+      navigate(`/verify/${connectedAddress}`, { replace: true })
+    }
+  }, [isConnected, connectedAddress, hasMyPool, routeAddress, selectedAddress])
+
   const handleSearch = () => {
     if (searchInput && isValidAddress(searchInput)) {
       setSelectedAddress(searchInput)
       navigate(`/verify/${searchInput}`)
+    }
+  }
+
+  const handleViewMyPool = () => {
+    if (connectedAddress) {
+      setSearchInput(connectedAddress)
+      setSelectedAddress(connectedAddress)
+      navigate(`/verify/${connectedAddress}`)
     }
   }
 
@@ -51,20 +90,117 @@ export function InvestorDashboard() {
   }
 
   const riskInfo = getRiskColor(riskScore)
+  const myRiskInfo = getRiskColor(myRiskScore)
+
+  const formatLp = (amt: bigint) => {
+    if (amt === 0n) return '0'
+    const str = amt.toString()
+    if (str.length > 18) {
+      const whole = str.slice(0, str.length - 18) || '0'
+      const frac = str.slice(str.length - 18, str.length - 14)
+      return `${Number(whole).toLocaleString()}.${frac}`
+    }
+    return str
+  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0A0A0A] text-black dark:text-white">
       <div className="max-w-5xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="text-center mb-10">
-          <span className="inline-block bg-black text-[#DFFF00] font-black uppercase text-xs px-4 py-1 border-2 border-black mb-4">INVESTOR FLOW</span>
-          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">Verify Position</h1>
-          <p className="font-mono text-gray-600 dark:text-gray-400 mt-2">Search any team address to inspect their vesting position</p>
+          <span className="inline-block bg-black text-[#DFFF00] font-black uppercase text-xs px-4 py-1 border-2 border-black mb-4">DASHBOARD</span>
+          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">Your Pools</h1>
+          <p className="font-mono text-gray-600 dark:text-gray-400 mt-2">View your launched pools &amp; search any team address</p>
         </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+         *  YOUR LAUNCHED POOL — auto-detected from connected wallet
+         * ═══════════════════════════════════════════════════════════════════ */}
+        {isConnected && !myPosLoading && hasMyPool && !isViewingSelf && (
+          <div className="mb-10">
+            <div className="flex items-center gap-3 mb-4">
+              <Rocket className="w-5 h-5 stroke-[2.5]" />
+              <h2 className="font-black uppercase text-xl tracking-tight">Your Launched Pool</h2>
+              <span className="bg-[#DFFF00] text-black text-[10px] font-black uppercase px-2 py-0.5 border-2 border-black">LIVE</span>
+            </div>
+            <div
+              onClick={handleViewMyPool}
+              className="bg-white dark:bg-[#111] border-4 border-black dark:border-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] p-6 cursor-pointer hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[10px_10px_0px_0px_rgba(255,255,255,1)] transition-all group"
+            >
+              <div className="flex flex-col md:flex-row md:items-center gap-6">
+                {/* Token Badge */}
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="w-16 h-16 border-4 border-black dark:border-white bg-[#DFFF00] flex items-center justify-center shrink-0">
+                    <span className="font-black text-xl text-black">{myTokenInfo?.symbol?.slice(0, 3) ?? '???'}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-black uppercase text-lg truncate">{myTokenInfo?.name ?? 'Unknown Token'}</h3>
+                    <p className="font-mono text-xs text-gray-500 dark:text-gray-400 truncate">{myPositionData!.tokenAddr}</p>
+                  </div>
+                </div>
+
+                {/* Stats Row */}
+                <div className="flex flex-wrap gap-4 md:ml-auto">
+                  <div className="border-4 border-black dark:border-white px-4 py-2 min-w-[120px]">
+                    <p className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400">LP Locked</p>
+                    <p className="font-black text-lg font-mono">{formatLp(myPositionData!.lpAmount)}</p>
+                  </div>
+                  <div className="border-4 border-black dark:border-white px-4 py-2 min-w-[120px]">
+                    <p className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400">Unlocked</p>
+                    <p className="font-black text-lg font-mono">{myPositionData!.unlockedPct}%</p>
+                  </div>
+                  <div className={`border-4 border-black dark:border-white px-4 py-2 min-w-[100px] ${myRiskInfo.bg} ${myRiskInfo.text}`}>
+                    <p className="text-[10px] font-bold uppercase opacity-70">Risk</p>
+                    <p className="font-black text-lg font-mono">{myRiskScore}/100</p>
+                  </div>
+                </div>
+
+                {/* Arrow */}
+                <div className="hidden md:flex items-center">
+                  <ChevronRight className="w-8 h-8 stroke-[3] group-hover:translate-x-2 transition-transform" />
+                </div>
+              </div>
+
+              {/* Unlock Progress */}
+              <div className="mt-4">
+                <div className="h-4 border-4 border-black dark:border-white bg-gray-200 dark:bg-[#1A1A1A] overflow-hidden">
+                  <div
+                    className="h-full bg-[#DFFF00] transition-all duration-700"
+                    style={{ width: `${myPositionData!.unlockedPct}%` }}
+                  />
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="font-mono text-[10px] text-gray-400">Registered {new Date(Number(myPositionData!.registeredAt) * 1000).toLocaleDateString()}</span>
+                  <span className="font-mono text-[10px] text-gray-400">{myPositionData!.unlockedPct}% vested</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading my pool */}
+        {isConnected && myPosLoading && (
+          <div className="mb-10 border-4 border-black dark:border-white p-8 text-center">
+            <div className="inline-block w-8 h-8 border-4 border-black dark:border-white border-t-[#DFFF00] rounded-full animate-spin mb-3" />
+            <p className="font-mono text-gray-500 dark:text-gray-400 text-sm">Loading your pool data...</p>
+          </div>
+        )}
+
+        {/* No pool yet */}
+        {isConnected && !myPosLoading && !hasMyPool && !viewAddress && (
+          <div className="mb-10 border-4 border-dashed border-gray-300 dark:border-gray-600 p-8 text-center">
+            <Wallet className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+            <p className="font-black uppercase text-gray-400 dark:text-gray-500 mb-1">No Launched Pool Found</p>
+            <p className="font-mono text-xs text-gray-400 dark:text-gray-500">
+              Connected as <span className="font-bold">{formatAddress(connectedAddress!)}</span> — go to{' '}
+              <a href="/launch" className="underline text-[#DFFF00] hover:text-black dark:hover:text-white">Launch</a> to create one
+            </p>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="bg-white dark:bg-[#111] border-4 border-black dark:border-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] p-6 mb-10">
-          <label className="block font-bold uppercase tracking-wider text-sm mb-2">Team / Deployer Address</label>
+          <label className="block font-bold uppercase tracking-wider text-sm mb-2">Search Any Address</label>
           <div className="flex gap-3">
             <input
               className={`${inp} flex-1`}
@@ -81,10 +217,20 @@ export function InvestorDashboard() {
               SEARCH
             </button>
           </div>
+
+          {/* Quick view own pool link */}
+          {isConnected && hasMyPool && !isViewingSelf && (
+            <button
+              onClick={handleViewMyPool}
+              className="mt-3 font-mono text-xs text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white flex items-center gap-1 transition-colors"
+            >
+              <Eye className="w-3 h-3" /> or view your own pool ({formatAddress(connectedAddress!)})
+            </button>
+          )}
         </div>
 
         {/* Loading */}
-        {posLoading && (
+        {posLoading && viewAddress && (
           <div className="border-4 border-black dark:border-white p-12 text-center mb-8">
             <div className="inline-block w-8 h-8 border-4 border-black dark:border-white border-t-[#DFFF00] rounded-full animate-spin mb-4" />
             <p className="font-mono text-gray-600 dark:text-gray-400">Reading on-chain position...</p>
@@ -101,6 +247,15 @@ export function InvestorDashboard() {
         {/* Position Data */}
         {positionData && !posLoading && (
           <div className="space-y-8">
+            {/* Viewing own pool badge */}
+            {isViewingSelf && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-[#DFFF00] border-4 border-black">
+                <Rocket className="w-4 h-4 stroke-[2.5]" />
+                <span className="font-black uppercase text-sm text-black">Viewing Your Pool</span>
+                <span className="font-mono text-xs text-black/60 ml-auto">{formatAddress(connectedAddress!)}</span>
+              </div>
+            )}
+
             {/* Top Row: Position + Risk */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Position Card */}
@@ -227,7 +382,7 @@ export function InvestorDashboard() {
                         {new Date(evt.timestamp).toLocaleTimeString()}
                       </span>
                       {evt.txHash && (
-                        <a href={`https://sepolia.uniscan.xyz/tx/${evt.txHash}`} target="_blank" rel="noopener noreferrer" className="shrink-0 hover:text-[#DFFF00]">
+                        <a href={`${UNICHAIN_EXPLORER}/tx/${evt.txHash}`} target="_blank" rel="noopener noreferrer" className="shrink-0 hover:text-[#DFFF00]">
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
@@ -239,12 +394,12 @@ export function InvestorDashboard() {
           </div>
         )}
 
-        {/* Empty State */}
-        {!teamAddress && !posLoading && (
+        {/* Empty State — not connected */}
+        {!isConnected && !viewAddress && !posLoading && (
           <div className="border-4 border-dashed border-gray-300 dark:border-gray-600 p-16 text-center">
-            <Search className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600 stroke-[1.5]" />
-            <p className="font-black uppercase text-xl text-gray-300 dark:text-gray-600 mb-2">No Address Selected</p>
-            <p className="font-mono text-gray-400 text-sm">Enter a team address above to view their vesting position</p>
+            <Wallet className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600 stroke-[1.5]" />
+            <p className="font-black uppercase text-xl text-gray-300 dark:text-gray-600 mb-2">Connect Your Wallet</p>
+            <p className="font-mono text-gray-400 text-sm">Connect your wallet to see your launched pools, or search any address above</p>
           </div>
         )}
       </div>

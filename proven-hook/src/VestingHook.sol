@@ -131,29 +131,33 @@ contract VestingHook is BaseHook {
     }
 
     /// @notice Hook: runs immediately after addLiquidity (Hook Point 1). Locks LP in VaultManager when sender is registered.
+    ///         NOTE: `sender` is the router contract (e.g. PoolModifyLiquidityTest), NOT the end-user.
+    ///         We resolve the team via `poolToTeam[poolId]` which was set in registerVestingPosition.
     function _afterAddLiquidity(
-        address sender,
+        address,
         PoolKey calldata key,
         ModifyLiquidityParams calldata params,
         BalanceDelta delta,
         BalanceDelta,
         bytes calldata
     ) internal override returns (bytes4, BalanceDelta) {
-        if (positions[sender].team == address(0)) {
+        PoolId poolId = key.toId();
+        address team = poolToTeam[poolId];
+
+        // No vesting position registered for this pool — allow freely.
+        if (team == address(0) || positions[team].team == address(0)) {
             return (this.afterAddLiquidity.selector, BalanceDeltaLibrary.ZERO_DELTA);
         }
 
-        PoolId poolId = key.toId();
         uint256 lpAmount = _calcLpFromDelta(params, delta);
         if (lpAmount == 0) {
             return (this.afterAddLiquidity.selector, BalanceDeltaLibrary.ZERO_DELTA);
         }
 
-        VAULT_MANAGER.depositPosition(sender, poolId, lpAmount);
-        positions[sender].lpAmount += lpAmount;
-        poolToTeam[poolId] = sender;
+        VAULT_MANAGER.depositPosition(team, poolId, lpAmount);
+        positions[team].lpAmount += lpAmount;
 
-        emit PositionLocked(sender, poolId, lpAmount);
+        emit PositionLocked(team, poolId, lpAmount);
         return (this.afterAddLiquidity.selector, BalanceDeltaLibrary.ZERO_DELTA);
     }
 
@@ -172,26 +176,30 @@ contract VestingHook is BaseHook {
     // ---------- Hook Point 2: Withdrawal gate (beforeRemoveLiquidity) ----------
 
     /// @notice Hook: runs before removeLiquidity. Gates vesting-team withdrawals by lock extension and unlocked %.
+    ///         NOTE: `sender` is the router contract. We resolve team via poolToTeam[poolId].
     function _beforeRemoveLiquidity(
-        address sender,
-        PoolKey calldata,
+        address,
+        PoolKey calldata key,
         ModifyLiquidityParams calldata params,
         bytes calldata
     ) internal view override returns (bytes4) {
+        PoolId poolId = key.toId();
+        address team = poolToTeam[poolId];
+
         // Check 1 — Not a vesting position: allow freely (normal LP).
-        if (positions[sender].team == address(0)) {
+        if (team == address(0) || positions[team].team == address(0)) {
             return this.beforeRemoveLiquidity.selector;
         }
 
         // Check 2 — Rage lock / alert active: no withdrawals until per-team lockExtendedUntil.
-        uint256 teamLockUntil = positions[sender].lockExtendedUntil;
+        uint256 teamLockUntil = positions[team].lockExtendedUntil;
         if (teamLockUntil != 0 && block.timestamp < teamLockUntil) {
             revert LockExtensionActive(teamLockUntil);
         }
 
         // Check 3 — Within authorized unlock %?
-        uint256 lpAmount = positions[sender].lpAmount;
-        uint256 maxWithdrawable = (lpAmount * unlockedPctByTeam[sender]) / 100;
+        uint256 lpAmount = positions[team].lpAmount;
+        uint256 maxWithdrawable = (lpAmount * unlockedPctByTeam[team]) / 100;
         uint256 requested = params.liquidityDelta < 0 ? uint256(-params.liquidityDelta) : uint256(params.liquidityDelta);
         if (requested > maxWithdrawable) {
             revert ExceedsUnlockedAmount(requested, maxWithdrawable);
@@ -269,7 +277,7 @@ contract VestingHook is BaseHook {
 
         // Price crash detection (Signal 3)
         uint256 currentPrice = (uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) >> 192;
-        if (lastPrice[poolId] > 0) {
+        if (lastPrice[poolId] > 0 && currentPrice < lastPrice[poolId]) {
             uint256 drop = (lastPrice[poolId] - currentPrice) * 100 / lastPrice[poolId];
             if (drop >= 30) {
                 emit CrashDetected(poolId, drop);

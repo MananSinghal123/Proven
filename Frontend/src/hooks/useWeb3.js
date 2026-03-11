@@ -40,6 +40,8 @@ const lasnaClient = createPublicClient({
     chain: lasnaTestnet,
     transport: http(LASNA_RPC),
 });
+/** Small delay so MetaMask's internal nonce tracker can catch up between sequential TXs */
+const nonceSafeWait = (ms = 2500) => new Promise((r) => setTimeout(r, ms));
 export const useTokenInfo = (tokenAddress) => {
     const [info, setInfo] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -312,6 +314,7 @@ export const useContractWrites = () => {
             ],
         });
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        await nonceSafeWait();
         return receipt;
     }, [walletClient, publicClient]);
     /** Register milestones on TimeLockRSC (Lasna Testnet)
@@ -340,6 +343,7 @@ export const useContractWrites = () => {
             chain: lasnaTestnet,
         });
         const receipt = await pc.waitForTransactionReceipt({ hash });
+        await nonceSafeWait();
         return receipt;
     }, []);
     /** Add genesis wallet on TimeLockRSC (Lasna)
@@ -358,6 +362,7 @@ export const useContractWrites = () => {
             chain: lasnaTestnet,
         });
         const receipt = await pc.waitForTransactionReceipt({ hash });
+        await nonceSafeWait();
         return receipt;
     }, []);
     /** Approve a token for spending by the PoolModifyLiquidityTest router */
@@ -371,6 +376,7 @@ export const useContractWrites = () => {
             args: [spender, amount],
         });
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        await nonceSafeWait();
         return receipt;
     }, [walletClient, publicClient]);
     /** Initialize a Uniswap v4 pool on the PoolManager */
@@ -384,6 +390,7 @@ export const useContractWrites = () => {
             args: [poolKey, sqrtPriceX96],
         });
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        await nonceSafeWait();
         return receipt;
     }, [walletClient, publicClient]);
     /** Add liquidity via PoolModifyLiquidityTest (triggers afterAddLiquidity hook) */
@@ -406,6 +413,7 @@ export const useContractWrites = () => {
             ],
         });
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        await nonceSafeWait();
         return receipt;
     }, [walletClient, publicClient]);
     /** Switch wallet to Lasna testnet (5318007) for RSC interactions */

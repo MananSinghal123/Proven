@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { createPublicClient, http, type Log } from 'viem'
+import { createPublicClient, http, type Log, keccak256, toHex, decodeAbiParameters, formatEther } from 'viem'
 import { useRSCMonitorStore } from '../store/rscMonitorStore'
-import { useRSCEventPolling } from '../hooks/useWeb3'
 import {
   VESTING_HOOK_ADDRESS,
   TIMELOCK_RSC_ADDRESS,
@@ -9,23 +8,26 @@ import {
   LASNA_RPC,
   UNICHAIN_EXPLORER,
   LASNA_EXPLORER,
-  SIGNAL_LABELS,
 } from '../config/constants'
 import { vestingHookAbi, timeLockRSCAbi } from '../config/contracts'
 import { formatAddress } from '../utils/format'
-import { Activity, Radio, Zap, ArrowRight, Filter, Pause, Play, ExternalLink, Layers, GitBranch, AlertTriangle } from 'lucide-react'
+import { Radio, Zap, ArrowRight, Pause, Play, ExternalLink, Layers, AlertTriangle, GitBranch, Wifi, WifiOff } from 'lucide-react'
 
 /* ── Viem clients for direct polling ── */
 const unichainClient = createPublicClient({ transport: http(UNICHAIN_RPC) })
 const lasnaClient = createPublicClient({ transport: http(LASNA_RPC) })
 
-/* ── Build a topic→name map from ABIs ── */
-const buildTopicMap = () => {
+/* ── Build a proper topic0 → event name map using keccak256 of event signatures ── */
+const buildTopicMap = (): Record<string, string> => {
   const map: Record<string, string> = {}
-  for (const item of [...vestingHookAbi, ...timeLockRSCAbi]) {
-    if ((item as any).type === 'event') {
-      map[(item as any).name] = (item as any).name
-    }
+  const allAbi = [...vestingHookAbi, ...timeLockRSCAbi]
+
+  for (const item of allAbi) {
+    if ((item as any).type !== 'event') continue
+    const evt = item as unknown as { name: string; inputs: Array<{ type: string }> }
+    const sig = `${evt.name}(${evt.inputs.map((i: any) => i.type).join(',')})`
+    const hash = keccak256(toHex(sig))
+    map[hash] = evt.name
   }
   return map
 }
@@ -34,8 +36,23 @@ const eventNameMap = buildTopicMap()
 const guessEventName = (log: Log): string => {
   const topic0 = log.topics?.[0]
   if (!topic0) return 'Unknown'
-  // Simple name lookup — in production you'd keccak256-match
   return eventNameMap[topic0] ?? `Event(${topic0.slice(0, 10)}...)`
+}
+
+/** Decode PoolMetricsUpdated(bytes32, uint256 tvl, uint256 cumulativeVol, uint256 uniqueUsers) */
+const decodePoolMetrics = (data: `0x${string}` | undefined): string => {
+  if (!data || data === '0x') return ''
+  try {
+    const decoded = decodeAbiParameters(
+      [{ name: 'tvl', type: 'uint256' }, { name: 'vol', type: 'uint256' }, { name: 'users', type: 'uint256' }],
+      data as `0x${string}`,
+    )
+    const tvl = Number(formatEther(decoded[0])).toFixed(2)
+    const vol = Number(formatEther(decoded[1])).toFixed(2)
+    return `TVL: ${tvl} · Vol: ${vol} · Users: ${decoded[2].toString()}`
+  } catch {
+    return ''
+  }
 }
 
 export function RSCActivityMonitor() {
@@ -53,6 +70,7 @@ export function RSCActivityMonitor() {
   const [projectFilter, setProjectFilter] = useState('')
   const [autoScroll, setAutoScroll] = useState(true)
   const [isPaused, setIsPaused] = useState(false)
+  const [relayStatus, setRelayStatus] = useState<'checking' | 'active' | 'waiting'>('checking')
   const leftRef = useRef<HTMLDivElement>(null)
   const rightRef = useRef<HTMLDivElement>(null)
 
@@ -64,7 +82,7 @@ export function RSCActivityMonitor() {
     const poll = async () => {
       try {
         const currentBlock = await unichainClient.getBlockNumber()
-        if (fromBlock === 0n) fromBlock = currentBlock > 5000n ? currentBlock - 5000n : 0n
+        if (fromBlock === 0n) fromBlock = currentBlock > 500n ? currentBlock - 500n : 0n
 
         const logs = await unichainClient.getLogs({
           address: VESTING_HOOK_ADDRESS,
@@ -74,14 +92,16 @@ export function RSCActivityMonitor() {
         fromBlock = currentBlock + 1n
 
         for (const log of logs) {
+          const evtName = guessEventName(log)
+          const metricsInfo = evtName === 'PoolMetricsUpdated' ? decodePoolMetrics(log.data) : ''
           addIncomingEvent({
             id: `uni-${log.transactionHash}-${log.logIndex}`,
             timestamp: Date.now(),
             chain: 'UNICHAIN_SEPOLIA',
             blockNumber: Number(log.blockNumber),
-            eventName: guessEventName(log),
+            eventName: evtName,
             fromAddress: log.address,
-            value: '',
+            value: metricsInfo || (log.data?.slice(0, 22) ?? ''),
             txHash: log.transactionHash ?? '0x',
           })
         }
@@ -103,7 +123,7 @@ export function RSCActivityMonitor() {
     const poll = async () => {
       try {
         const currentBlock = await lasnaClient.getBlockNumber()
-        if (fromBlock === 0n) fromBlock = currentBlock > 5000n ? currentBlock - 5000n : 0n
+        if (fromBlock === 0n) fromBlock = currentBlock > 500n ? currentBlock - 500n : 0n
 
         const logs = await lasnaClient.getLogs({
           address: TIMELOCK_RSC_ADDRESS,
@@ -154,6 +174,39 @@ export function RSCActivityMonitor() {
     return () => clearInterval(interval)
   }, [isPaused, addRSCResponse, setStats])
 
+  /* ── Poll RSC contract stats directly ── */
+  useEffect(() => {
+    if (isPaused) return
+    const pollStats = async () => {
+      try {
+        const [reactCalls, callbacks] = await Promise.all([
+          lasnaClient.readContract({
+            address: TIMELOCK_RSC_ADDRESS,
+            abi: timeLockRSCAbi,
+            functionName: 'totalReactCalls',
+          }),
+          lasnaClient.readContract({
+            address: TIMELOCK_RSC_ADDRESS,
+            abi: timeLockRSCAbi,
+            functionName: 'totalCallbacks',
+          }),
+        ])
+        setStats({
+          totalReactCalls: Number(reactCalls),
+          totalCallbacksDispatched: Number(callbacks),
+          totalMilestonesUnlocked: stats.totalMilestonesUnlocked,
+          totalLockExtensionsApplied: stats.totalLockExtensionsApplied,
+        })
+        setRelayStatus(Number(reactCalls) > 0 ? 'active' : 'waiting')
+      } catch (err) {
+        console.error('RSC stats polling error:', err)
+      }
+    }
+    pollStats()
+    const interval = setInterval(pollStats, 10_000)
+    return () => clearInterval(interval)
+  }, [isPaused, setStats])
+
   /* ── Auto-scroll ── */
   useEffect(() => {
     if (!autoScroll) return
@@ -179,6 +232,11 @@ export function RSCActivityMonitor() {
             <p className="font-mono text-gray-600 dark:text-gray-400 mt-1">Dual-chain event stream — Unichain Sepolia ↔ Lasna</p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Relay status */}
+            <div className={`flex items-center gap-2 px-4 py-2 border-4 border-black dark:border-white font-bold uppercase text-xs ${relayStatus === 'active' ? 'bg-green-400 text-black' : relayStatus === 'waiting' ? 'bg-yellow-300 text-black' : 'bg-gray-200 dark:bg-[#1A1A1A]'}`}>
+              {relayStatus === 'active' ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              RSC RELAY: {relayStatus === 'active' ? 'ACTIVE' : relayStatus === 'waiting' ? 'WAITING' : 'CHECKING'}
+            </div>
             {/* Live indicator */}
             <div className={`flex items-center gap-2 px-4 py-2 border-4 border-black dark:border-white font-bold uppercase text-sm ${isPaused ? 'bg-gray-200 dark:bg-[#1A1A1A]' : 'bg-[#DFFF00] text-black'}`}>
               <span className={`w-3 h-3 border-2 border-black dark:border-white ${isPaused ? 'bg-gray-400' : 'bg-[#FF3333] animate-pulse'}`} />
@@ -253,9 +311,12 @@ export function RSCActivityMonitor() {
                   {incomingEvents.filter(e => !projectFilter || e.fromAddress.toLowerCase().includes(projectFilter.toLowerCase())).map((evt) => (
                     <div key={evt.id} className="p-3 hover:bg-gray-50 dark:hover:bg-[#111] transition font-mono text-xs">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-black text-sm">{evt.eventName}</span>
+                        <span className={`px-2 py-0.5 border-2 border-black dark:border-white font-black text-[10px] ${evt.eventName === 'PoolMetricsUpdated' ? 'bg-[#DFFF00] text-black' : evt.eventName === 'CrashDetected' ? 'bg-[#FF3333] text-white' : evt.eventName === 'PositionRegistered' ? 'bg-blue-400 text-black' : 'bg-gray-200 dark:bg-[#1A1A1A]'}`}>{evt.eventName}</span>
                         <span className="text-gray-400">Block #{evt.blockNumber}</span>
                       </div>
+                      {evt.value && (
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">{evt.value}</div>
+                      )}
                       <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                         <span>{formatAddress(evt.fromAddress)}</span>
                         {evt.txHash && evt.txHash !== '0x' && (
@@ -324,6 +385,11 @@ export function RSCActivityMonitor() {
         <div className="mt-8 p-5 border-4 border-black dark:border-white bg-gray-100 dark:bg-[#111] font-mono text-xs text-gray-600 dark:text-gray-400">
           <span className="font-black text-black dark:text-white font-sans uppercase">How it works:</span> VestingHook events on Unichain (left) are picked up by the Reactive Network. The RSC evaluates 5 signals, computes a composite risk score, and dispatches callbacks (right) — either unlocking milestones or extending timelocks.
         </div>
+        {relayStatus === 'waiting' && (
+          <div className="mt-4 p-5 border-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 font-mono text-xs text-yellow-800 dark:text-yellow-300">
+            <span className="font-black font-sans uppercase">⏳ Relay Status:</span> The Reactive Network relay has not yet delivered events to the RSC contract on Lasna (totalReactCalls = 0). Events are confirmed on Unichain — the relay will process them when the testnet infrastructure catches up. RSC contract: {formatAddress(TIMELOCK_RSC_ADDRESS as `0x${string}`)}
+          </div>
+        )}
       </div>
     </div>
   )

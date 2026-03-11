@@ -13,10 +13,14 @@ import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 
+import {PoolIdLibrary} from "v4-core/types/PoolId.sol";
+
 contract VestingHookTest is Test {
+    using PoolIdLibrary for PoolKey;
+
     VestingHookTestHelper public hook;
     MockVaultManager public vault;
-    PoolId constant POOL_ID = PoolId.wrap(keccak256("test-pool"));
+    PoolId public POOL_ID; // computed from _buildPoolKey() in setUp
     address constant POOL_MANAGER = address(1);
     address constant RSC_AUTHORIZER = address(0xABCD);
 
@@ -25,6 +29,8 @@ contract VestingHookTest is Test {
         // 3-arg constructor: (IPoolManager, IVaultManager, address _rscAuthorizer)
         hook = new VestingHookTestHelper(IPoolManager(POOL_MANAGER), vault, RSC_AUTHORIZER);
         vault.setHook(address(hook));
+        // Compute POOL_ID from the same key used in tests
+        POOL_ID = _buildPoolKey().toId();
     }
 
     // ═══════════════════════════════════════════════════════════════════════

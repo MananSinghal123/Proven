@@ -7,10 +7,10 @@ import {IReactive} from "reactive-lib/interfaces/IReactive.sol";
 /**
  * @title TimeLockRSC
  * @author Proven Protocol
- * @notice Reactive Smart Contract deployed on the Reactive Network (Lasna testnet, chain 5318007).
- *         ONE RSC deployed once. Never redeployed. Handles unlimited teams autonomously.
+ * @notice Reactive Smart Contract deployed on the Reactive Network Lasna testnet.
+ *         RSC deployed once. Never redeployed. Handles unlimited teams autonomously.
  *
- *         Monitors VestingHook events on Ethereum Sepolia and:
+ *         Monitors VestingHook events on Unichain Sepolia and:
  *         1. Auto-indexes new teams via PositionRegistered (dynamic subscriptions)
  *         2. Evaluates milestone conditions (TVL / Volume / Users)
  *         3. Runs 5-signal rug detection with scoring & decay

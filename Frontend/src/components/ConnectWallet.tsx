@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useNetwork } from 'wagmi'
 import { Wallet, ChevronDown, Copy, ExternalLink, LogOut, Check } from 'lucide-react'
 import { UNICHAIN_EXPLORER, UNICHAIN_SEPOLIA_CHAIN_ID, LASNA_CHAIN_ID, LASNA_EXPLORER } from '../config/constants'
@@ -6,7 +6,7 @@ import { UNICHAIN_EXPLORER, UNICHAIN_SEPOLIA_CHAIN_ID, LASNA_CHAIN_ID, LASNA_EXP
 export function ConnectWallet() {
   const { address, isConnected } = useAccount()
   const { connect, connectors, isLoading: isConnecting } = useConnect()
-  const { disconnect } = useDisconnect()
+  const { disconnect, disconnectAsync } = useDisconnect()
   const { chain } = useNetwork()
   const [showDropdown, setShowDropdown] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -97,7 +97,22 @@ export function ConnectWallet() {
             View Explorer
           </a>
 
-          <button onClick={() => { disconnect(); setShowDropdown(false) }} className="w-full text-left px-4 py-3 font-mono text-sm font-bold text-[#FF3333] hover:bg-[#FF3333] hover:text-white transition-colors flex items-center gap-2">
+          <button
+            onClick={async () => {
+              try {
+                await disconnectAsync()
+              } catch {
+                disconnect()
+              }
+              // Clear any wagmi-persisted state in localStorage
+              localStorage.removeItem('wagmi.store')
+              localStorage.removeItem('wagmi.wallet')
+              localStorage.removeItem('wagmi.connected')
+              localStorage.removeItem('wagmi.cache')
+              setShowDropdown(false)
+            }}
+            className="w-full text-left px-4 py-3 font-mono text-sm font-bold text-[#FF3333] hover:bg-[#FF3333] hover:text-white transition-colors flex items-center gap-2"
+          >
             <LogOut className="w-4 h-4 stroke-[2]" />
             Disconnect
           </button>
