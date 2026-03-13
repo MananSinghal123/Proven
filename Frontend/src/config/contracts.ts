@@ -24,6 +24,21 @@ export const vestingHookAbi = [
   },
   {
     type: 'function',
+    name: 'positions',
+    inputs: [
+      { name: '', type: 'address' },
+      { name: '', type: 'uint256' },
+    ],
+    outputs: [
+      { name: 'conditionType', type: 'uint8' },
+      { name: 'threshold', type: 'uint256' },
+      { name: 'unlockPct', type: 'uint8' },
+      { name: 'complete', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'unlockedPctByTeam',
     inputs: [{ name: '', type: 'address' }],
     outputs: [{ name: '', type: 'uint8' }],

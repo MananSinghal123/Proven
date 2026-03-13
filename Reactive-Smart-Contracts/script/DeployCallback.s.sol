@@ -28,7 +28,7 @@ contract DeployCallbackScript is Script {
 
         vm.startBroadcast();
 
-        ProvenCallback callback = new ProvenCallback{value: 0.1 ether}(
+        ProvenCallback callback = new ProvenCallback{value: 0.001 ether}(
             vestingHook,
             callbackSender
         );

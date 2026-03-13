@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { ConnectWallet } from './ConnectWallet'
+import { ProvenLogo } from './ProvenLogo'
 import { useThemeStore } from '../store/themeStore'
 import { Sun, Moon } from 'lucide-react'
 
@@ -20,8 +21,8 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-black dark:bg-[#DFFF00] border-2 border-black dark:border-white" />
-          <span className="text-3xl font-black uppercase tracking-tighter">Proven</span>
+          <ProvenLogo size={24} className="shrink-0" />
+          <span className="text-3xl font-black uppercase tracking-tighter text-black dark:text-white">Proven</span>
         </Link>
 
         {/* Center Nav */}

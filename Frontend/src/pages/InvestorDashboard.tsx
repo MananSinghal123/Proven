@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useVerifyStore } from '../store/verifyStore'
-import { useWallet, usePositionData, useRiskScore, useTokenInfo, useHookEventPolling } from '../hooks/useWeb3'
-import { isValidAddress, formatAddress } from '../utils/format'
-import { SIGNAL_LABELS, UNICHAIN_EXPLORER } from '../config/constants'
+import { useVerifyStore } from '../store/verifyStore.ts'
+import { useWallet, usePositionData, useRiskScore, useTokenInfo, useHookEventPolling, useRugSignals, useMilestoneLockState, useMilestoneConfig } from '../hooks/useWeb3.ts'
+import { isValidAddress, formatAddress } from '../utils/format.ts'
+import { SIGNAL_LABELS, UNICHAIN_EXPLORER, LASNA_EXPLORER } from '../config/constants.ts'
 import { Search, Shield, Activity, AlertTriangle, Clock, Unlock, Lock, ChevronRight, ExternalLink, Rocket, Wallet, Eye, BarChart3 } from 'lucide-react'
 
 export function InvestorDashboard() {
@@ -33,6 +33,9 @@ export function InvestorDashboard() {
   /* ── Searched address position ── */
   const { data: positionData, loading: posLoading, error: posError } = usePositionData(viewAddress || undefined)
   const { score: riskScore, tier: riskTier } = useRiskScore(viewAddress || undefined)
+  const { occurredSignals, lastTxBySignal, triggerMetaBySignal } = useRugSignals(viewAddress || undefined)
+  const { lockedMilestones, unlockedMilestones, unlockTxByMilestone } = useMilestoneLockState(viewAddress || undefined)
+  const { milestones: configuredMilestones, loading: milestoneConfigLoading, error: milestoneConfigError } = useMilestoneConfig(viewAddress || undefined)
   const tokenAddr = positionData?.tokenAddr
   const { info: tokenInfo } = useTokenInfo(
     tokenAddr && tokenAddr !== '0x0000000000000000000000000000000000000000' ? tokenAddr : undefined,
@@ -89,9 +92,55 @@ export function InvestorDashboard() {
     return { bg: 'bg-[#FF3333]', text: 'text-white', label: 'HIGH RISK' }
   }
 
-  const riskInfo = getRiskColor(riskScore)
+  const nowSec = BigInt(Math.floor(Date.now() / 1000))
+  const inferredFromLock =
+    positionData?.lockExtendedUntil && positionData.lockExtendedUntil > nowSec
+      ? {
+          score: positionData.lockExtendedUntil - nowSec > 7n * 24n * 60n * 60n ? 75 : 50,
+          tier: positionData.lockExtendedUntil - nowSec > 7n * 24n * 60n * 60n ? 3 : 2,
+        }
+      : null
+
+  const displayRiskScore = riskScore > 0 || riskTier > 0 ? riskScore : (inferredFromLock?.score ?? 0)
+  const displayRiskTier = riskScore > 0 || riskTier > 0 ? riskTier : (inferredFromLock?.tier ?? 0)
+
+  const riskInfo = getRiskColor(displayRiskScore)
   const myRiskInfo = getRiskColor(myRiskScore)
-  const riskTierLabel = riskTier === 0 ? 'SAFE' : riskTier === 1 ? 'WATCH' : riskTier === 2 ? 'ALERT' : 'RAGE'
+  const riskTierLabel = displayRiskTier === 0 ? 'SAFE' : displayRiskTier === 1 ? 'WATCH' : displayRiskTier === 2 ? 'ALERT' : 'RAGE'
+  const occurredSignalSet = new Set(occurredSignals)
+  const occurredSignalText = occurredSignals.length > 0 ? occurredSignals.join(', ') : 'None'
+  const lockedMilestoneText = lockedMilestones.length > 0 ? lockedMilestones.map((m) => `M${m}`).join(', ') : 'None'
+  const unlockedMilestoneText = unlockedMilestones.length > 0 ? unlockedMilestones.map((m) => `M${m}`).join(', ') : 'None'
+  const conditionLabel = (type: number) => type === 0 ? 'TVL' : type === 1 ? 'VOLUME' : type === 2 ? 'USERS' : 'UNKNOWN'
+  const formatUsdcShort = (raw: bigint) => {
+    const whole = raw / 10n ** 18n
+    if (whole >= 1_000_000_000n) return `$${(Number(whole / 100_000_000n) / 10).toFixed(1)}B`
+    if (whole >= 1_000_000n) return `$${(Number(whole / 100_000n) / 10).toFixed(1)}M`
+    if (whole >= 1_000n) return `$${(Number(whole / 100n) / 10).toFixed(1)}K`
+    return `$${whole.toString()}`
+  }
+  const formatMilestoneThreshold = (conditionType: number, threshold: bigint) => {
+    if (conditionType === 0 || conditionType === 1) return `${formatUsdcShort(threshold)} USDC`
+    return threshold.toString()
+  }
+  const milestoneFallbackSub = milestoneConfigError
+    ? `Config unavailable: ${milestoneConfigError}`
+    : milestoneConfigLoading
+      ? 'Loading milestone config...'
+      : 'Awaiting milestone config'
+  const milestoneCards = configuredMilestones.length === 3
+    ? configuredMilestones.map((m, i) => ({
+        key: i + 1,
+        pct: m.unlockPct,
+        done: m.complete,
+        sub: `${conditionLabel(m.conditionType)} ≥ ${formatMilestoneThreshold(m.conditionType, m.threshold)}`,
+      }))
+    : [30, 70, 100].map((m, i) => ({
+        key: i + 1,
+        pct: m,
+        done: positionData ? positionData.unlockedPct >= m : false,
+        sub: milestoneFallbackSub,
+      }))
   const poolStatus = !positionData
     ? 'No pool loaded'
     : positionData.team === '0x0000000000000000000000000000000000000000'
@@ -268,7 +317,7 @@ export function InvestorDashboard() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="border-4 border-black dark:border-white p-4 bg-[#DFFF00] text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <p className="text-[10px] uppercase font-bold opacity-70">Risk Score</p>
-                <p className="font-black text-3xl leading-none mt-1">{riskScore}</p>
+                <p className="font-black text-3xl leading-none mt-1">{displayRiskScore}</p>
                 <p className="font-mono text-[10px] mt-1">Tier: {riskTierLabel}</p>
               </div>
               <div className="border-4 border-black dark:border-white p-4 bg-white dark:bg-[#111] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]">
@@ -323,7 +372,7 @@ export function InvestorDashboard() {
                   <h3 className="font-black uppercase text-sm mb-4 border-b-4 border-black dark:border-white pb-2">Risk Gauge</h3>
                   <div className="flex items-center gap-4">
                     <div className={`w-24 h-24 border-4 border-black dark:border-white ${riskInfo.bg} ${riskInfo.text} flex flex-col items-center justify-center`}>
-                      <span className="font-black text-3xl leading-none">{riskScore}</span>
+                      <span className="font-black text-3xl leading-none">{displayRiskScore}</span>
                       <span className="font-bold text-[10px]">/100</span>
                     </div>
                     <div>
@@ -351,16 +400,45 @@ export function InvestorDashboard() {
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
-                      {[30, 70, 100].map((m, i) => {
-                        const done = positionData.unlockedPct >= m
+                      {milestoneCards.map((m) => {
+                        const done = m.done
                         return (
-                          <div key={m} className={`border-4 border-black dark:border-white p-3 ${done ? 'bg-[#DFFF00] text-black' : 'bg-white dark:bg-[#0A0A0A]'}`}>
-                            <p className="text-[10px] font-bold uppercase">Milestone {i + 1}</p>
-                            <p className="font-black text-lg">{m}%</p>
+                          <div key={m.key} className={`border-4 border-black dark:border-white p-3 ${done ? 'bg-[#DFFF00] text-black' : 'bg-white dark:bg-[#0A0A0A]'}`}>
+                            <p className="text-[10px] font-bold uppercase">Milestone {m.key}</p>
+                            <p className="font-black text-lg">{m.pct}%</p>
                             <p className="font-mono text-[10px]">{done ? 'Completed' : 'Pending'}</p>
+                            <p className="font-mono text-[10px] opacity-70 mt-1 truncate">{m.sub}</p>
                           </div>
                         )
                       })}
+                    </div>
+                    <div className="border-2 border-black dark:border-white p-3 bg-gray-50 dark:bg-[#0A0A0A]">
+                      {milestoneConfigError && (
+                        <p className="font-mono text-[10px] text-[#FF3333] mb-2">
+                          Milestone config read failed. Showing fallback thresholds.
+                        </p>
+                      )}
+                      <p className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Milestone lock state</p>
+                      <p className="font-mono text-xs mt-1">Locked: <span className="font-black">{lockedMilestoneText}</span></p>
+                      <p className="font-mono text-xs">Unlocked: <span className="font-black">{unlockedMilestoneText}</span></p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {unlockedMilestones.map((m) => {
+                          const key = `M${m}`
+                          const tx = unlockTxByMilestone[key]
+                          if (!tx) return null
+                          return (
+                            <a
+                              key={key}
+                              href={`${UNICHAIN_EXPLORER}/tx/${tx}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] inline-flex items-center gap-1 border-2 border-black dark:border-white px-2 py-1 hover:text-[#DFFF00]"
+                            >
+                              {key} unlock tx <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -369,6 +447,7 @@ export function InvestorDashboard() {
                   <h3 className="font-black uppercase text-lg mb-4 border-b-4 border-black dark:border-white pb-2 flex items-center gap-2">
                     <Activity className="w-5 h-5" /> Signal Watchlist
                   </h3>
+                  <p className="font-mono text-[11px] mb-3 text-gray-500 dark:text-gray-400">Occurred: <span className="font-black text-black dark:text-white">{occurredSignalText}</span></p>
                   <div className="overflow-x-auto">
                     <table className="w-full font-mono text-xs border-separate border-spacing-y-2">
                       <thead>
@@ -379,15 +458,37 @@ export function InvestorDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {signals.map((sig) => (
+                        {signals.map((sig) => {
+                          const triggered = occurredSignalSet.has(sig.id)
+                          const triggerMeta = triggerMetaBySignal[sig.id]
+                          return (
                           <tr key={sig.id} className="bg-gray-50 dark:bg-[#0A0A0A]">
                             <td className="border-2 border-black dark:border-white px-3 py-2 font-black">{sig.id}</td>
                             <td className="border-2 border-black dark:border-white px-3 py-2">{sig.label}</td>
                             <td className="border-2 border-black dark:border-white px-3 py-2">
-                              <span className="px-2 py-1 border-2 border-black dark:border-white bg-white dark:bg-[#111] font-bold uppercase text-[10px]">Monitoring</span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`px-2 py-1 border-2 border-black dark:border-white font-bold uppercase text-[10px] ${triggered ? 'bg-[#FF3333] text-white' : 'bg-white dark:bg-[#111]'}`}>
+                                  {triggered ? 'Triggered' : 'Monitoring'}
+                                </span>
+                                {triggered && triggerMeta && (
+                                  <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
+                                    {triggerMeta.label}{typeof triggerMeta.points === 'number' ? ` (+${triggerMeta.points})` : ''}
+                                  </span>
+                                )}
+                                {triggered && lastTxBySignal[sig.id] && (
+                                  <a
+                                    href={`${triggerMeta?.source === 'rsc' ? LASNA_EXPLORER : UNICHAIN_EXPLORER}/tx/${lastTxBySignal[sig.id]}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] inline-flex items-center gap-1 hover:text-[#DFFF00]"
+                                  >
+                                    tx <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                )}
+                              </div>
                             </td>
                           </tr>
-                        ))}
+                        )})}
                       </tbody>
                     </table>
                   </div>

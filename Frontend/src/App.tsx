@@ -1,11 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { WagmiConfig } from 'wagmi'
-import { wagmiConfig } from './config/wagmi'
-import { Navbar } from './components/Navbar'
-import { Home } from './pages/Home'
-import { LaunchPool } from './pages/LaunchPool'
-import { InvestorDashboard } from './pages/InvestorDashboard'
-import { RSCActivityMonitor } from './pages/RSCActivityMonitor'
+import { wagmiConfig } from './config/wagmi.ts'
+import { Navbar } from './components/Navbar.tsx'
+import { Home } from './pages/Home.tsx'
+import { LaunchPool } from './pages/LaunchPool.tsx'
+import { InvestorDashboard } from './pages/InvestorDashboard.tsx'
+import { RSCActivityMonitor } from './pages/RSCActivityMonitor.tsx'
 function App() {
   return (
     <WagmiConfig config={wagmiConfig}>

@@ -1,6 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Link, useLocation } from 'react-router-dom';
 import { ConnectWallet } from './ConnectWallet';
+import { ProvenLogo } from './ProvenLogo';
 import { useThemeStore } from '../store/themeStore';
 import { Sun, Moon } from 'lucide-react';
 export function Navbar() {
@@ -13,7 +14,7 @@ export function Navbar() {
         { path: '/verify', label: 'DASHBOARD' },
         { path: '/monitor', label: 'MONITOR' },
     ];
-    return (_jsx("nav", { className: "fixed top-0 w-full bg-white dark:bg-[#0A0A0A] border-b-4 border-black dark:border-white z-50", children: _jsxs("div", { className: "max-w-7xl mx-auto px-6 h-20 flex items-center justify-between", children: [_jsxs(Link, { to: "/", className: "flex items-center gap-2", children: [_jsx("div", { className: "w-8 h-8 bg-black dark:bg-[#DFFF00] border-2 border-black dark:border-white" }), _jsx("span", { className: "text-3xl font-black uppercase tracking-tighter", children: "Proven" })] }), _jsx("div", { className: "hidden md:flex items-center gap-2 font-bold tracking-tight", children: links.map(({ path, label }) => {
+    return (_jsx("nav", { className: "fixed top-0 w-full bg-white dark:bg-[#0A0A0A] border-b-4 border-black dark:border-white z-50", children: _jsxs("div", { className: "max-w-7xl mx-auto px-6 h-20 flex items-center justify-between", children: [_jsxs(Link, { to: "/", className: "flex items-center gap-2", children: [_jsx(ProvenLogo, { size: 24, className: "shrink-0" }), _jsx("span", { className: "text-3xl font-black uppercase tracking-tighter text-black dark:text-white", children: "Proven" })] }), _jsx("div", { className: "hidden md:flex items-center gap-2 font-bold tracking-tight", children: links.map(({ path, label }) => {
                         const isActive = location.pathname === path ||
                             (path !== '/' && location.pathname.startsWith(path));
                         return (_jsx(Link, { to: path, className: `px-3 py-1.5 border-2 transition-colors ${isActive

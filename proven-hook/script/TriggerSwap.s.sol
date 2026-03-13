@@ -41,7 +41,7 @@ interface IPoolSwapTest {
 contract TriggerSwap is Script {
     // ── Deployed addresses on Unichain Sepolia ──
     address constant POOL_SWAP_TEST = 0x9140a78c1A137c7fF1c151EC8231272aF78a99A4;
-    address constant VESTING_HOOK   = 0x854BcA4456489aCa8Ccf6bA37D6EF3E9869E8640;
+    address constant VESTING_HOOK   = 0xC7bFe6835bC6a4d9A32f0F34A75C21A0982D8640;
 
     // ── Pool tokens (sorted) ──
     address constant TOKEN0 = 0x11aFfEac94B440C3c332813450db66fb3285BFB2; // USDC (lower address)
@@ -90,11 +90,12 @@ contract TriggerSwap is Script {
 
         // Execute swap — this triggers afterSwap → PoolMetricsUpdated event
         console.log("Executing swap: 10 USDC -> PTT");
+        bytes memory hookData = abi.encode(deployer);
         IPoolSwapTest(POOL_SWAP_TEST).swap(
             poolKey,
             params,
             settings,
-            bytes("")
+            hookData
         );
         console.log("Swap executed! PoolMetricsUpdated event emitted.");
         console.log("RSC should pick this up on Lasna within ~30 seconds.");

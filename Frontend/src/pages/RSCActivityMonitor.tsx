@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPublicClient, http, type Log, keccak256, toHex, decodeAbiParameters, formatEther } from 'viem'
-import { useRSCMonitorStore } from '../store/rscMonitorStore'
+import { useRSCMonitorStore } from '../store/rscMonitorStore.ts'
 import {
   VESTING_HOOK_ADDRESS,
   TIMELOCK_RSC_ADDRESS,
@@ -8,14 +8,15 @@ import {
   LASNA_RPC,
   UNICHAIN_EXPLORER,
   LASNA_EXPLORER,
-} from '../config/constants'
-import { vestingHookAbi, timeLockRSCAbi } from '../config/contracts'
-import { formatAddress } from '../utils/format'
+} from '../config/constants.ts'
+import { vestingHookAbi, timeLockRSCAbi } from '../config/contracts.ts'
+import { formatAddress } from '../utils/format.ts'
 import { Radio, Zap, ArrowRight, Pause, Play, ExternalLink, Layers, AlertTriangle, GitBranch, Wifi, WifiOff } from 'lucide-react'
 
 /* ── Viem clients for direct polling ── */
 const unichainClient = createPublicClient({ transport: http(UNICHAIN_RPC) })
 const lasnaClient = createPublicClient({ transport: http(LASNA_RPC) })
+const MONITOR_LOOKBACK_BLOCKS = 5_000_000n
 
 /* ── Build a proper topic0 → event name map using keccak256 of event signatures ── */
 const buildTopicMap = (): Record<string, string> => {
@@ -37,6 +38,29 @@ const guessEventName = (log: Log): string => {
   const topic0 = log.topics?.[0]
   if (!topic0) return 'Unknown'
   return eventNameMap[topic0] ?? `Event(${topic0.slice(0, 10)}...)`
+}
+
+const topicToAddress = (topic?: `0x${string}`): `0x${string}` | null => {
+  if (!topic || topic.length !== 66) return null
+  return `0x${topic.slice(26)}` as `0x${string}`
+}
+
+const extractRelatedTeam = (eventName: string, log: Log): `0x${string}` | null => {
+  switch (eventName) {
+    case 'PositionRegistered':
+    case 'PositionLocked':
+    case 'MilestoneUnlocked':
+    case 'LockExtended':
+    case 'WithdrawalsPaused':
+    case 'UnlockAuthorized':
+    case 'RiskScoreUpdated':
+    case 'RiskElevated':
+    case 'SignalTriggered':
+    case 'ComboBonus':
+      return topicToAddress(log.topics?.[1] as `0x${string}` | undefined)
+    default:
+      return null
+  }
 }
 
 /** Decode PoolMetricsUpdated(bytes32, uint256 tvl, uint256 cumulativeVol, uint256 uniqueUsers) */
@@ -82,7 +106,7 @@ export function RSCActivityMonitor() {
     const poll = async () => {
       try {
         const currentBlock = await unichainClient.getBlockNumber()
-        if (fromBlock === 0n) fromBlock = currentBlock > 500n ? currentBlock - 500n : 0n
+        if (fromBlock === 0n) fromBlock = currentBlock > MONITOR_LOOKBACK_BLOCKS ? currentBlock - MONITOR_LOOKBACK_BLOCKS : 0n
 
         const logs = await unichainClient.getLogs({
           address: VESTING_HOOK_ADDRESS,
@@ -94,6 +118,7 @@ export function RSCActivityMonitor() {
         for (const log of logs) {
           const evtName = guessEventName(log)
           const metricsInfo = evtName === 'PoolMetricsUpdated' ? decodePoolMetrics(log.data) : ''
+          const relatedTeam = extractRelatedTeam(evtName, log)
           addIncomingEvent({
             id: `uni-${log.transactionHash}-${log.logIndex}`,
             timestamp: Date.now(),
@@ -101,7 +126,10 @@ export function RSCActivityMonitor() {
             blockNumber: Number(log.blockNumber),
             eventName: evtName,
             fromAddress: log.address,
-            value: metricsInfo || (log.data?.slice(0, 22) ?? ''),
+            value: [
+              relatedTeam ? `team:${relatedTeam}` : '',
+              metricsInfo || (log.data?.slice(0, 22) ?? ''),
+            ].filter(Boolean).join(' · '),
             txHash: log.transactionHash ?? '0x',
           })
         }
@@ -123,7 +151,7 @@ export function RSCActivityMonitor() {
     const poll = async () => {
       try {
         const currentBlock = await lasnaClient.getBlockNumber()
-        if (fromBlock === 0n) fromBlock = currentBlock > 500n ? currentBlock - 500n : 0n
+        if (fromBlock === 0n) fromBlock = currentBlock > MONITOR_LOOKBACK_BLOCKS ? currentBlock - MONITOR_LOOKBACK_BLOCKS : 0n
 
         const logs = await lasnaClient.getLogs({
           address: TIMELOCK_RSC_ADDRESS,
@@ -140,6 +168,7 @@ export function RSCActivityMonitor() {
         for (const log of logs) {
           reactCalls++
           const evtName = guessEventName(log)
+          const relatedTeam = extractRelatedTeam(evtName, log)
           if (evtName.toLowerCase().includes('callback') || evtName.toLowerCase().includes('dispatch')) callbacks++
           if (evtName.toLowerCase().includes('unlock')) unlocks++
           if (evtName.toLowerCase().includes('extend') || evtName.toLowerCase().includes('lock')) extensions++
@@ -148,13 +177,13 @@ export function RSCActivityMonitor() {
             id: `lasna-${log.transactionHash}-${log.logIndex}`,
             timestamp: Date.now(),
             signalId: 'S?',
-            conditionChecked: evtName,
+            conditionChecked: relatedTeam ? `${evtName} · team:${relatedTeam}` : evtName,
             result: 'TRIGGERED',
             scoreChange: 0,
             newCompositeScore: 0,
             actionTaken: evtName,
             callbackTxHash: log.transactionHash ?? null,
-            projectAddress: log.address,
+            projectAddress: relatedTeam ?? log.address,
           })
         }
 
@@ -308,7 +337,16 @@ export function RSCActivityMonitor() {
                 </div>
               ) : (
                 <div className="divide-y-2 divide-black dark:divide-white">
-                  {incomingEvents.filter(e => !projectFilter || e.fromAddress.toLowerCase().includes(projectFilter.toLowerCase())).map((evt) => (
+                  {incomingEvents.filter((e) => {
+                    if (!projectFilter) return true
+                    const q = projectFilter.toLowerCase()
+                    return (
+                      e.fromAddress.toLowerCase().includes(q) ||
+                      e.eventName.toLowerCase().includes(q) ||
+                      e.value.toLowerCase().includes(q) ||
+                      e.txHash.toLowerCase().includes(q)
+                    )
+                  }).map((evt) => (
                     <div key={evt.id} className="p-3 hover:bg-gray-50 dark:hover:bg-[#111] transition font-mono text-xs">
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`px-2 py-0.5 border-2 border-black dark:border-white font-black text-[10px] ${evt.eventName === 'PoolMetricsUpdated' ? 'bg-[#DFFF00] text-black' : evt.eventName === 'CrashDetected' ? 'bg-[#FF3333] text-white' : evt.eventName === 'PositionRegistered' ? 'bg-blue-400 text-black' : 'bg-gray-200 dark:bg-[#1A1A1A]'}`}>{evt.eventName}</span>
@@ -351,7 +389,16 @@ export function RSCActivityMonitor() {
                 </div>
               ) : (
                 <div className="divide-y-2 divide-black dark:divide-white">
-                  {rscResponses.filter(r => !projectFilter || r.projectAddress.toLowerCase().includes(projectFilter.toLowerCase())).map((res) => (
+                  {rscResponses.filter((r) => {
+                    if (!projectFilter) return true
+                    const q = projectFilter.toLowerCase()
+                    return (
+                      r.projectAddress.toLowerCase().includes(q) ||
+                      r.conditionChecked.toLowerCase().includes(q) ||
+                      r.actionTaken.toLowerCase().includes(q) ||
+                      (r.callbackTxHash ?? '').toLowerCase().includes(q)
+                    )
+                  }).map((res) => (
                     <div key={res.id} className="p-3 hover:bg-gray-50 dark:hover:bg-[#111] transition font-mono text-xs">
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`px-2 py-0.5 border-2 border-black dark:border-white font-black text-[10px] ${res.result === 'TRIGGERED' ? 'bg-[#FF3333] text-white' : 'bg-gray-200 dark:bg-[#1A1A1A]'}`}>

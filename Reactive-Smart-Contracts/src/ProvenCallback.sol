@@ -48,6 +48,12 @@ contract ProvenCallback is AbstractCallback {
     event MilestoneUnlockRelayed(address indexed team, uint8 milestoneId);
     event LockExtendRelayed(address indexed team, uint32 penaltyDays);
     event PauseWithdrawalsRelayed(address indexed team, uint32 pauseHours);
+    event DebugReactProbe(
+        address indexed rsc,
+        uint256 reactCalls,
+        uint256 topic0,
+        uint256 sourceChainId
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     //                            CONSTRUCTOR
@@ -112,5 +118,19 @@ contract ProvenCallback is AbstractCallback {
     ) external authorizedSenderOnly {
         HOOK.pauseWithdrawals(team, pauseHours);
         emit PauseWithdrawalsRelayed(team, pauseHours);
+    }
+
+    /**
+     * @notice Debug-only probe emitted from TimeLockRSC.react() callback path.
+     * @dev Helps verify ReactVM-side values on destination-chain events.
+     */
+    function debugReactProbe(
+        address,        // rvm_id — injected by Reactive Network, not used
+        address rsc,
+        uint256 reactCalls,
+        uint256 topic0,
+        uint256 sourceChainId
+    ) external authorizedSenderOnly {
+        emit DebugReactProbe(rsc, reactCalls, topic0, sourceChainId);
     }
 }

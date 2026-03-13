@@ -171,6 +171,16 @@ contract TimeLockRSC is AbstractReactive {
     uint256 public totalReactCalls;
     uint256 public totalCallbacks;
 
+    /// @notice Temporary candidate link: wallet that likely belongs to a team's genesis flow.
+    ///         Finalized into walletToTeam when that wallet emits an outbound transfer.
+    mapping(address => address) public pendingGenesisTeam;
+
+    /// @notice Timestamp when pendingGenesisTeam was set.
+    mapping(address => uint256) public pendingGenesisAt;
+
+    /// @notice Time window to confirm a pending genesis candidate.
+    uint256 private constant GENESIS_LINK_WINDOW = 1 days;
+
     // ═══════════════════════════════════════════════════════════════════════════
     //                              EVENTS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -208,6 +218,9 @@ contract TimeLockRSC is AbstractReactive {
     event DebugPauseCallbackQueued(address indexed team, uint32 pauseHours);
     event DebugExtendCallbackQueued(address indexed team, uint32 penaltyDays);
     event DebugBootstrapPositionRegSubscription(bool success);
+    event DebugReactProbeCallbackQueued(uint256 reactCalls, uint256 topic0, uint256 chainId);
+    event DebugGenesisCandidateLinked(address indexed wallet, address indexed team, uint256 amount);
+    event DebugGenesisWalletAutoLinked(address indexed wallet, address indexed team);
 
     // ═══════════════════════════════════════════════════════════════════════════
     //                              ERRORS
@@ -265,6 +278,18 @@ contract TimeLockRSC is AbstractReactive {
     function react(LogRecord calldata log) external vmOnly {
         totalReactCalls++;
 
+        // Debug callback: surface VM-side values on destination chain for verification.
+        bytes memory debugPayload = abi.encodeWithSignature(
+            "debugReactProbe(address,address,uint256,uint256,uint256)",
+            address(0),
+            address(this),
+            totalReactCalls,
+            log.topic_0,
+            log.chain_id
+        );
+        emit Callback(CALLBACK_CHAIN_ID, CALLBACK_ADDR, CALLBACK_GAS_LIMIT, debugPayload);
+        emit DebugReactProbeCallbackQueued(totalReactCalls, log.topic_0, log.chain_id);
+
         emit DebugReactMeta(
             log.topic_0,
             log.topic_1,
@@ -299,7 +324,27 @@ contract TimeLockRSC is AbstractReactive {
             }
         } else if (topic == TRANSFER_TOPIC) {
             address from = address(uint160(log.topic_1));
+            address to = address(uint160(log.topic_2));
             address team = walletToTeam[from];
+
+            // If sender has no direct mapping, try to resolve via recent candidate link.
+            if (team == address(0)) {
+                address candidateTeam = pendingGenesisTeam[from];
+                uint256 linkedAt = pendingGenesisAt[from];
+                if (
+                    candidateTeam != address(0) &&
+                    linkedAt != 0 &&
+                    block.timestamp >= linkedAt &&
+                    block.timestamp - linkedAt <= GENESIS_LINK_WINDOW
+                ) {
+                    team = candidateTeam;
+                    walletToTeam[from] = candidateTeam;
+                    TeamConfig storage candidateCfg = configs[candidateTeam];
+                    if (candidateCfg.team == address(0)) candidateCfg.team = candidateTeam;
+                    if (candidateCfg.deployer == address(0)) candidateCfg.deployer = candidateTeam;
+                    emit DebugGenesisWalletAutoLinked(from, candidateTeam);
+                }
+            }
 
             // Fallback: if team mapping is missing in current execution context,
             // treat sender as team to keep S1/S2 monitoring functional.
@@ -312,6 +357,15 @@ contract TimeLockRSC is AbstractReactive {
 
             emit DebugTransferTeamLookup(from, team);
             if (team != address(0)) {
+                // Learn potential genesis wallets directly in ReactVM context:
+                // when deployer sends tokens to a new wallet, mark recipient as candidate.
+                if (from == configs[team].deployer && to != address(0) && to != team && walletToTeam[to] == address(0)) {
+                    uint256 amount = abi.decode(log.data, (uint256));
+                    pendingGenesisTeam[to] = team;
+                    pendingGenesisAt[to] = block.timestamp;
+                    emit DebugGenesisCandidateLinked(to, team, amount);
+                }
+
                 // Determine if deployer (S1) or genesis wallet (S2)
                 if (from == configs[team].deployer) {
                     _evalDeployerOutflow(team, log); // S1

@@ -60,12 +60,12 @@ contract TriggerRSC is Script {
     // Deployed addresses on Unichain Sepolia
     address constant USDC  = 0x11aFfEac94B440C3c332813450db66fb3285BFB2;
     address constant PRVN  = 0x3c2d1A5c84B7F513ed07Fe2e71dF9538aC217F7c;
-    address constant HOOK  = 0x854BcA4456489aCa8Ccf6bA37D6EF3E9869E8640;
+    address constant HOOK  = 0xC7bFe6835bC6a4d9A32f0F34A75C21A0982D8640;
     address constant SWAP_ROUTER = 0x9140a78c1A137c7fF1c151EC8231272aF78a99A4;
 
     // New wallet to register position from
-    address constant NEW_WALLET = 0xFF4604cC16bf1fcAD5cA4C26B75f4A6fDD3BA13a;
-    uint256 constant NEW_WALLET_PK = 0x880b65064329685fa918ca3e8c5b64b15d1b1d6ba0eb8e0a807b258052b8d6b4;
+    address constant NEW_WALLET = 0x64BFbA32D016AB89956a15b442E6ee3C049c040a;
+    uint256 constant NEW_WALLET_PK = 0x714f84b42e2eb4b5ecf44fd221069ab125c6cea241f7cf6b0d5bd0bd22e22d81;
 
     function getPoolKey() internal pure returns (PoolKey memory) {
         return PoolKey({
@@ -89,10 +89,8 @@ contract TriggerRSC is Script {
         payable(NEW_WALLET).transfer(0.01 ether);
         console.log("Sent 0.01 ETH to new wallet");
 
-        // Send tokens for the position (not needed for registration, but good to have)
-        IERC20(USDC).transfer(NEW_WALLET, 100e18);
-        IERC20(PRVN).transfer(NEW_WALLET, 100e18);
-        console.log("Sent 100 USDC + 100 PRVN to new wallet");
+        // Token funding is optional for registration; skipped to keep this debug path deterministic.
+        console.log("Skipped token funding; registration does not require token balances");
 
         vm.stopBroadcast();
 
@@ -130,11 +128,31 @@ contract TriggerRSC is Script {
             settleUsingBurn: false
         });
 
+        bytes memory hookData = abi.encode(msg.sender);
+
         // Do 3 swaps to generate enough signal
         for (uint256 i = 0; i < 3; i++) {
-            IPoolSwapTest(SWAP_ROUTER).swap(key, params, settings, "");
+            IPoolSwapTest(SWAP_ROUTER).swap(key, params, settings, hookData);
         }
         console.log("=== 3 swaps executed, PoolMetricsUpdated events emitted ===");
+
+        vm.stopBroadcast();
+    }
+
+    /// @notice Registration-only path (assumes NEW_WALLET already has gas)
+    function phase1_registerOnly() public {
+        PoolKey memory key = getPoolKey();
+        PoolId poolId = key.toId();
+
+        vm.startBroadcast(NEW_WALLET_PK);
+
+        Milestone[3] memory milestones;
+        milestones[0] = Milestone({conditionType: 0, threshold: 500e18,  unlockPct: 30, complete: false});
+        milestones[1] = Milestone({conditionType: 1, threshold: 1000e18, unlockPct: 40, complete: false});
+        milestones[2] = Milestone({conditionType: 2, threshold: 3,       unlockPct: 30, complete: false});
+
+        IVestingHook(HOOK).registerVestingPosition(milestones, PRVN, poolId);
+        console.log("=== PositionRegistered emitted from NEW_WALLET ===");
 
         vm.stopBroadcast();
     }

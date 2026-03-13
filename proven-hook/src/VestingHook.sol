@@ -256,9 +256,21 @@ contract VestingHook is BaseHook {
         PoolKey calldata key,
         SwapParams calldata,
         BalanceDelta delta,
-        bytes calldata
+        bytes calldata hookData
     ) internal override returns (bytes4, int128) {
         PoolId poolId = key.toId();
+
+        // Router-based swaps pass router as `sender`. Use real actor for unique user counting:
+        // 1) Prefer hookData-encoded user address when provided
+        // 2) Fallback to tx.origin when sender is an intermediate contract
+        // 3) Else use sender directly
+        address actor = sender;
+        if (hookData.length == 32) {
+            actor = abi.decode(hookData, (address));
+            if (actor == address(0)) actor = tx.origin;
+        } else if (sender != tx.origin) {
+            actor = tx.origin;
+        }
 
         // Metrics: cumulative volume (sum of absolute deltas)
         uint256 amt0 = _abs128(BalanceDeltaLibrary.amount0(delta));
@@ -266,9 +278,9 @@ contract VestingHook is BaseHook {
         uint256 swapAmt = amt0 + amt1;
         cumulativeVolume[poolId] += swapAmt;
 
-        if (!hasSwapped[poolId][sender]) {
+        if (!hasSwapped[poolId][actor]) {
             uniqueSwapperCount[poolId]++;
-            hasSwapped[poolId][sender] = true;
+            hasSwapped[poolId][actor] = true;
         }
 
         (uint160 sqrtPriceX96,,,) = StateLibrary.getSlot0(poolManager, poolId);
