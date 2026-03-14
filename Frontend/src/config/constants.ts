@@ -45,7 +45,7 @@ export const CONDITION_TYPE_MAP = {
   USERS: 2,
 } as const
 
-/* ─── Signal labels (S1-S5 from TimeLockRSC) ─── */
+/* ─── Signal labels (S1-S5 from RiskGuardRSC) ─── */
 export const SIGNAL_LABELS: Record<number, string> = {
   0: 'Large Holder Outflow',
   1: 'Treasury Drain',

@@ -15,6 +15,7 @@ import {
   BarChart3,
   Eye,
 } from 'lucide-react'
+import { ProvenLogo } from '../components/ProvenLogo'
 
 export function Home() {
   return (
@@ -48,7 +49,7 @@ export function Home() {
                 Deploy Liquidity <ArrowRight size={20} className="stroke-[3]" />
               </Link>
               <a
-                href="https://docs.reactive.network"
+                href="https://github.com/minrawsjar/Proven"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold uppercase tracking-wide border-4 border-black dark:border-white px-8 py-4 flex items-center justify-center gap-3 transition-all duration-200 ease-in-out bg-white dark:bg-[#0A0A0A] text-black dark:text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] active:translate-y-0 active:translate-x-0 active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)]"
@@ -376,7 +377,7 @@ export function Home() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 font-mono">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 bg-[#DFFF00] border-2 border-white dark:border-black" />
+              <ProvenLogo size={28} className="shrink-0" />
               <span className="text-3xl font-black uppercase tracking-tighter font-sans">
                 Proven Protocol
               </span>
@@ -419,9 +420,10 @@ export function Home() {
         </div>
 
         <div className="max-w-7xl mx-auto mt-16 pt-8 border-t-4 border-white dark:border-black flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="font-mono text-gray-500 dark:text-gray-400">
-            © 2026 PROVEN PROTOCOL. BUILT FOR DECENTRALIZED ACCOUNTABILITY.
-          </p>
+          <div className="flex items-center gap-2 font-mono text-gray-500 dark:text-gray-400">
+            <ProvenLogo size={16} className="shrink-0" />
+            <p>© 2026 PROVEN PROTOCOL. BUILT FOR DECENTRALIZED ACCOUNTABILITY.</p>
+          </div>
           <div className="flex gap-6 font-mono text-sm text-gray-500 dark:text-gray-400">
             <span>Unichain Sepolia</span>
             <span>·</span>

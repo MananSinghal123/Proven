@@ -9,7 +9,7 @@ import {
   UNICHAIN_EXPLORER,
   LASNA_EXPLORER,
 } from '../config/constants.ts'
-import { vestingHookAbi, timeLockRSCAbi } from '../config/contracts.ts'
+import { vestingHookAbi, riskGuardRSCAbi } from '../config/contracts.ts'
 import { formatAddress } from '../utils/format.ts'
 import { Radio, Zap, ArrowRight, Pause, Play, ExternalLink, Layers, AlertTriangle, GitBranch, Wifi, WifiOff } from 'lucide-react'
 
@@ -21,7 +21,7 @@ const MONITOR_LOOKBACK_BLOCKS = 5_000_000n
 /* ── Build a proper topic0 → event name map using keccak256 of event signatures ── */
 const buildTopicMap = (): Record<string, string> => {
   const map: Record<string, string> = {}
-  const allAbi = [...vestingHookAbi, ...timeLockRSCAbi]
+  const allAbi = [...vestingHookAbi, ...riskGuardRSCAbi]
 
   for (const item of allAbi) {
     if ((item as any).type !== 'event') continue
@@ -211,12 +211,12 @@ export function RSCActivityMonitor() {
         const [reactCalls, callbacks] = await Promise.all([
           lasnaClient.readContract({
             address: TIMELOCK_RSC_ADDRESS,
-            abi: timeLockRSCAbi,
+            abi: riskGuardRSCAbi,
             functionName: 'totalReactCalls',
           }),
           lasnaClient.readContract({
             address: TIMELOCK_RSC_ADDRESS,
-            abi: timeLockRSCAbi,
+            abi: riskGuardRSCAbi,
             functionName: 'totalCallbacks',
           }),
         ])
@@ -376,7 +376,7 @@ export function RSCActivityMonitor() {
               <GitBranch className="w-5 h-5 stroke-[2.5] text-[#DFFF00]" />
               <div>
                 <h3 className="font-black uppercase text-sm text-[#DFFF00]">Lasna RSC</h3>
-                <p className="font-mono text-[10px] text-gray-400">TimeLockRSC · Chain 5318007</p>
+                <p className="font-mono text-[10px] text-gray-400">RiskGuardRSC · Chain 5318007</p>
               </div>
               <span className="ml-auto bg-[#DFFF00] text-black font-mono text-xs px-3 py-1 font-bold">
                 {rscResponses.length} RESPONSES

@@ -174,7 +174,7 @@ export function InvestorDashboard() {
             <p className="font-mono text-sm text-gray-600 dark:text-gray-400 mt-1">Track one team at a time: status, risk, unlocks, and live events.</p>
           </div>
           <div className="border-4 border-black dark:border-white px-4 py-2 bg-[#DFFF00] text-black font-mono text-xs">
-            Comic UI • Real on-chain data
+            Real on-chain data
           </div>
         </div>
 
