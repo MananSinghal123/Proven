@@ -705,7 +705,7 @@ Learn more: [Reactive Network Docs](https://dev.reactive.network)
 
 ## Contributing
 
-This project is built for the Reactive Network hackathon. Contributions welcome after the event.
+This project is built for Atrium academy's UHI8 Hookathon. Contributions welcome after the event.
 
 1. Fork the repo
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
