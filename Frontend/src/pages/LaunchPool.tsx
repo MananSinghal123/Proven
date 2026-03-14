@@ -38,6 +38,7 @@ export function LaunchPool() {
   const [newWallet, setNewWallet] = useState('')
   const [understood, setUnderstood] = useState(false)
   const [selectedFeeTier, setSelectedFeeTier] = useState(0.3)
+  const [customPairTokenAddress, setCustomPairTokenAddress] = useState('')
 
   const [tokenAmount, setTokenAmount] = useState('')
   const [pairAmount, setPairAmount] = useState('')
@@ -49,10 +50,32 @@ export function LaunchPool() {
   const [txError, setTxError] = useState<string | null>(null)
   const [computedPoolId, setComputedPoolId] = useState<`0x${string}` | null>(null)
 
+  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+  const UNICHAIN_USDC_ADDRESS = '0x11aFfEac94B440C3c332813450db66fb3285BFB2'
+  const pairSelection = poolConfig?.pairToken ?? 'USDC'
+
+  const resolvedPairTokenAddress = (
+    pairSelection === 'WETH'
+      ? ZERO_ADDRESS
+      : pairSelection === 'Custom'
+      ? customPairTokenAddress
+      : UNICHAIN_USDC_ADDRESS
+  ) as `0x${string}`
+
   const tokenAddr = poolConfig?.tokenAddress as `0x${string}` | undefined
   const { info: tokenInfo, loading: tokenLoading } = useTokenInfo(
     tokenAddr && isValidAddress(tokenAddr) ? tokenAddr : undefined,
   )
+  const { info: pairTokenInfo, loading: pairTokenLoading } = useTokenInfo(
+    resolvedPairTokenAddress !== ZERO_ADDRESS && isValidAddress(resolvedPairTokenAddress)
+      ? resolvedPairTokenAddress
+      : undefined,
+  )
+
+  const pairTokenSymbol =
+    pairSelection === 'WETH'
+      ? 'WETH'
+      : pairTokenInfo?.symbol ?? (pairSelection === 'USDC' ? 'USDC' : 'CUSTOM')
 
   if (milestones.length === 0) {
     setMilestones([
@@ -71,6 +94,10 @@ export function LaunchPool() {
       setFormErrors({ general: 'Invalid token address' })
       return
     }
+    if (pairSelection === 'Custom' && !isValidAddress(customPairTokenAddress)) {
+      setFormErrors({ general: 'Invalid custom pair token address' })
+      return
+    }
     setCurrentStep(2)
     setFormErrors({})
   }
@@ -87,12 +114,17 @@ export function LaunchPool() {
     }
 
     const projectToken = poolConfig!.tokenAddress as `0x${string}`
-    const pairTokenAddr = (poolConfig?.pairToken === 'WETH'
-      ? '0x0000000000000000000000000000000000000000'
-      : '0x11aFfEac94B440C3c332813450db66fb3285BFB2') as `0x${string}`
+    if (pairSelection === 'Custom' && !isValidAddress(customPairTokenAddress)) {
+      setTxError('Invalid custom pair token address')
+      return
+    }
+
+    const pairTokenAddr = resolvedPairTokenAddress
 
     const decimals = tokenInfo?.decimals ?? 18
-    const pairDecimals = 18
+    const pairDecimals = pairSelection === 'WETH'
+      ? 18
+      : pairTokenInfo?.decimals ?? (pairSelection === 'USDC' ? 6 : 18)
     const tokenAmt = parseUnits(tokenAmount || '1000', decimals)
     const pairAmt = parseUnits(pairAmount || '1000', pairDecimals)
 
@@ -117,7 +149,7 @@ export function LaunchPool() {
       const MAX = 115792089237316195423570985008687907853269984665640564039457584007913129639935n
       const r1 = await approveToken(projectToken, router, MAX)
       setTxHashes(p => ({ ...p, approve0: r1.transactionHash }))
-      if (pairTokenAddr !== '0x0000000000000000000000000000000000000000') {
+      if (pairTokenAddr !== ZERO_ADDRESS) {
         const r2 = await approveToken(pairTokenAddr, router, MAX)
         setTxHashes(p => ({ ...p, approve1: r2.transactionHash }))
       }
@@ -228,11 +260,43 @@ export function LaunchPool() {
             <label className="block font-bold uppercase tracking-wider text-sm mb-2">Pair Token</label>
             <div className="grid grid-cols-3 gap-3">
               {['USDC', 'WETH', 'Custom'].map((token) => (
-                <button key={token} className={`p-3 border-4 border-black dark:border-white font-bold uppercase text-sm transition-all ${poolConfig?.pairToken === token ? 'bg-[#DFFF00] text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]' : 'bg-white dark:bg-[#111] hover:bg-gray-100 dark:hover:bg-[#1A1A1A]'}`} onClick={() => setPoolConfig({ ...poolConfig, pairToken: token } as any)}>
+                <button key={token} className={`p-3 border-4 border-black dark:border-white font-bold uppercase text-sm transition-all ${pairSelection === token ? 'bg-[#DFFF00] text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]' : 'bg-white dark:bg-[#111] hover:bg-gray-100 dark:hover:bg-[#1A1A1A]'}`} onClick={() => setPoolConfig({ ...poolConfig, pairToken: token } as any)}>
                   {token}
                 </button>
               ))}
             </div>
+
+            {pairSelection === 'Custom' && (
+              <div className="mt-4">
+                <input
+                  className={inp}
+                  placeholder="Custom pair token address (0x...)"
+                  value={customPairTokenAddress}
+                  onChange={(e) => setCustomPairTokenAddress(e.target.value)}
+                />
+                {pairTokenLoading && (
+                  <div className="mt-3 p-3 border-4 border-black dark:border-white bg-gray-100 dark:bg-[#1A1A1A] flex items-center gap-3">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="font-mono text-sm">Reading pair token data...</span>
+                  </div>
+                )}
+                {pairTokenInfo && (
+                  <div className="mt-3 p-3 border-4 border-black bg-[#DFFF00] flex items-center gap-3 font-mono text-sm text-black">
+                    <span className="font-black">✓</span>
+                    <span className="font-bold">{pairTokenInfo.symbol}</span>
+                    <span>•</span>
+                    <span>{pairTokenInfo.name}</span>
+                    <span>•</span>
+                    <span>Decimals: {pairTokenInfo.decimals}</span>
+                  </div>
+                )}
+                {customPairTokenAddress && isValidAddress(customPairTokenAddress) && !pairTokenLoading && !pairTokenInfo && (
+                  <div className="mt-3 p-3 border-4 border-[#FF3333] bg-white dark:bg-[#111] font-mono text-sm text-[#FF3333]">
+                    ⚠ Pair token not found on Unichain Sepolia
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -261,12 +325,12 @@ export function LaunchPool() {
               </div>
               <div>
                 <input className={inp} placeholder="Pair amount" value={pairAmount} onChange={(e) => setPairAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
-                <p className="text-gray-500 dark:text-gray-400 text-xs mt-1 font-mono">{poolConfig?.pairToken ?? 'USDC'}</p>
+                <p className="text-gray-500 dark:text-gray-400 text-xs mt-1 font-mono">{pairTokenSymbol}</p>
               </div>
             </div>
             {(tokenAmount || pairAmount) && (
               <div className="mt-3 p-3 border-4 border-black bg-[#DFFF00] text-center font-mono font-bold text-black">
-                {tokenAmount || '0'} {tokenInfo?.symbol ?? 'TOKEN'} + {pairAmount || '0'} {poolConfig?.pairToken ?? 'USDC'}
+                {tokenAmount || '0'} {tokenInfo?.symbol ?? 'TOKEN'} + {pairAmount || '0'} {pairTokenSymbol}
               </div>
             )}
           </div>
@@ -428,8 +492,8 @@ export function LaunchPool() {
         {/* Summary */}
         <div className="p-6 border-4 border-black dark:border-white bg-gray-100 dark:bg-[#0A0A0A] mb-8 font-mono text-sm space-y-2.5">
           <h4 className="font-black text-lg uppercase font-sans mb-4 border-b-2 border-black dark:border-white pb-2">Transaction Summary</h4>
-          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Pool</span><span className="font-bold">{tokenInfo?.symbol ?? 'TOKEN'} / {poolConfig?.pairToken ?? 'USDC'} · {selectedFeeTier}% fee</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Liquidity</span><span className="font-black">{tokenAmount || '0'} {tokenInfo?.symbol ?? 'TOKEN'} + {pairAmount || '0'} {poolConfig?.pairToken ?? 'USDC'}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Pool</span><span className="font-bold">{tokenInfo?.symbol ?? 'TOKEN'} / {pairTokenSymbol} · {selectedFeeTier}% fee</span></div>
+          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Liquidity</span><span className="font-black">{tokenAmount || '0'} {tokenInfo?.symbol ?? 'TOKEN'} + {pairAmount || '0'} {pairTokenSymbol}</span></div>
           <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Chain</span><span>Unichain Sepolia (1301)</span></div>
           {computedPoolId && <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Pool ID</span><span className="text-xs">{computedPoolId.slice(0, 18)}...</span></div>}
           <div className="h-1 w-full bg-black dark:bg-white my-3" />
